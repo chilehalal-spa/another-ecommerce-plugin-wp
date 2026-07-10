@@ -72,6 +72,7 @@ final class Activator
             name VARCHAR(190) NOT NULL DEFAULT '',
             price INT UNSIGNED NOT NULL DEFAULT 0,
             pdf_file VARCHAR(255) NOT NULL DEFAULT '',
+            image_url VARCHAR(255) NOT NULL DEFAULT '',
             active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL,
             PRIMARY KEY  (id),

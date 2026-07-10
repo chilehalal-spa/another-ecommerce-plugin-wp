@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Another Ecommerce Plugin
  * Description:       Venta de un único PDF con botón "Comprar ahora": pago con Webpay Plus (Transbank), sin carrito ni registro, entrega por correo con enlace de descarga temporal.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Chile Halal

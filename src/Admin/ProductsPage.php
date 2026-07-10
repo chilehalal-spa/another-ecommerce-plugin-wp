@@ -61,6 +61,7 @@ final class ProductsPage
             <table class="widefat striped">
                 <thead>
                     <tr>
+                        <th>Portada</th>
                         <th>Nombre</th>
                         <th>Precio</th>
                         <th>Shortcode</th>
@@ -71,10 +72,17 @@ final class ProductsPage
                 </thead>
                 <tbody>
                 <?php if ($products === []) : ?>
-                    <tr><td colspan="6">Todavía no has creado ningún producto. Usa «Añadir nuevo» para subir tu primer PDF.</td></tr>
+                    <tr><td colspan="7">Todavía no has creado ningún producto. Usa «Añadir nuevo» para subir tu primer PDF.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($products as $product) : ?>
                     <tr>
+                        <td>
+                            <?php if ($product->image_url !== '') : ?>
+                                <img src="<?php echo esc_url($product->image_url); ?>" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">
+                            <?php else : ?>
+                                <span style="color:#999;">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td><strong><?php echo esc_html($product->name); ?></strong></td>
                         <td>$<?php echo esc_html(number_format($product->price, 0, ',', '.')); ?></td>
                         <td><code>[aep_comprar id="<?php echo esc_html((string) $product->id); ?>"]</code></td>
@@ -117,6 +125,7 @@ final class ProductsPage
             'invalid' => 'Ingresa un nombre y un precio mayor a 0.',
             'pdf' => 'No se pudo subir el PDF. Verifica que sea un archivo .pdf válido.',
             'nopdf' => 'Debes subir un PDF para este producto.',
+            'image' => 'No se pudo subir la imagen. Verifica que sea un JPG, PNG o WebP válido.',
             default => '',
         };
 
@@ -152,6 +161,19 @@ final class ProductsPage
                     <tr>
                         <th scope="row"><label for="aep-active">Estado</label></th>
                         <td><label><input type="checkbox" id="aep-active" name="aep_active" value="1" <?php checked($product === null || $product->active); ?>> Activo (visible y comprable)</label></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="aep-image">Imagen de portada</label></th>
+                        <td>
+                            <?php if ($product !== null && $product->image_url !== '') : ?>
+                                <p>
+                                    <img src="<?php echo esc_url($product->image_url); ?>" alt="" style="max-width:200px;height:auto;border-radius:8px;display:block;margin-bottom:8px;">
+                                    <label><input type="checkbox" name="aep_remove_image" value="1"> Quitar la imagen actual</label>
+                                </p>
+                            <?php endif; ?>
+                            <input type="file" id="aep-image" name="aep_image" accept="image/jpeg,image/png,image/webp">
+                            <p class="description">Opcional. Se muestra como portada del botón "Comprar ahora" (recomendado: horizontal, mínimo 600×400px).</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="aep-pdf">Archivo PDF</label></th>
@@ -203,6 +225,32 @@ final class ProductsPage
         }
 
         $pdfFile = $existing->pdf_file ?? '';
+        $imageUrl = $existing->image_url ?? '';
+
+        if (!empty($_POST['aep_remove_image'])) {
+            $imageUrl = '';
+        }
+
+        if (!empty($_FILES['aep_image']['name'])) {
+            if (!function_exists('wp_handle_upload')) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
+
+            // La imagen es pública (se muestra en la página de venta), así
+            // que va al directorio normal de uploads: no necesita el filtro
+            // que redirige al directorio protegido del PDF.
+            $imageResult = wp_handle_upload($_FILES['aep_image'], [
+                'test_form' => false,
+                'mimes' => ['jpg|jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'],
+            ]);
+
+            if (!isset($imageResult['url']) || isset($imageResult['error'])) {
+                wp_safe_redirect(add_query_arg('aep_error', 'image', $formUrl));
+                exit;
+            }
+
+            $imageUrl = $imageResult['url'];
+        }
 
         if (!empty($_FILES['aep_pdf']['name'])) {
             if (!function_exists('wp_handle_upload')) {
@@ -251,10 +299,11 @@ final class ProductsPage
                 'name' => $name,
                 'price' => $price,
                 'pdf_file' => $pdfFile,
+                'image_url' => $imageUrl,
                 'active' => $active ? 1 : 0,
             ]);
         } else {
-            $id = $this->products->create($name, $price, $pdfFile, $active);
+            $id = $this->products->create($name, $price, $pdfFile, $active, $imageUrl);
         }
 
         wp_safe_redirect(add_query_arg(['page' => self::SLUG, 'aep_saved' => '1'], admin_url('admin.php')));

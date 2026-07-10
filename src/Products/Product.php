@@ -13,6 +13,7 @@ final class Product
     public string $name = '';
     public int $price = 0;
     public string $pdf_file = '';
+    public string $image_url = '';
     public bool $active = true;
     public string $created_at = '';
 
@@ -23,6 +24,7 @@ final class Product
         $product->name = (string) $row->name;
         $product->price = (int) $row->price;
         $product->pdf_file = (string) $row->pdf_file;
+        $product->image_url = (string) ($row->image_url ?? '');
         $product->active = ((int) $row->active) === 1;
         $product->created_at = (string) $row->created_at;
 

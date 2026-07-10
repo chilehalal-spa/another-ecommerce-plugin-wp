@@ -48,6 +48,11 @@ final class Plugin
         $this->gateway = new WebpayGateway();
         $this->mailer = new Mailer();
 
+        // Aplica cambios de esquema (columnas/tablas nuevas) en sitios donde
+        // el plugin ya estaba activo, sin que haga falta desactivarlo y
+        // reactivarlo. Barato: en el caso normal es solo un get_option().
+        add_action('init', [$this, 'maybeUpgrade']);
+
         // Registrado siempre (no solo en admin): los correos de compra se
         // envían desde el frontend y deben pasar por el SMTP configurado.
         add_action('phpmailer_init', [SettingsPage::class, 'configurePhpMailer']);
@@ -73,6 +78,21 @@ final class Plugin
             add_action('admin_post_aep_save_product', [$productsPage, 'handleSave']);
             add_action('admin_post_aep_toggle_product', [$productsPage, 'handleToggle']);
             add_action('admin_post_aep_delete_product', [$productsPage, 'handleDelete']);
+        }
+    }
+
+    /**
+     * Vuelve a correr las rutinas de activación (crear/alterar tablas,
+     * columnas nuevas, directorio protegido) si la versión del plugin
+     * avanzó desde la última vez. Activator::activate() es idempotente:
+     * dbDelta solo agrega lo que falta, y el resto de pasos se saltan si
+     * ya existen. Así un sitio ya desplegado recibe los cambios de esquema
+     * en el primer request tras actualizar los archivos del plugin.
+     */
+    public function maybeUpgrade(): void
+    {
+        if (get_option('aep_db_version') !== AEP_VERSION) {
+            \AnotherEcommerce\Install\Activator::activate();
         }
     }
 

@@ -22,7 +22,8 @@ compartido — cada shortcode vende un único artículo).
 3. Activa el plugin en **Plugins** (crea las tablas `wp_aep_orders` y
    `wp_aep_products`, y el directorio protegido `wp-content/uploads/aep-protected/`).
 4. En **Venta PDF → Productos**: crea un producto (nombre, precio en CLP,
-   sube el PDF). Repite por cada PDF que quieras vender.
+   sube el PDF y, si quieres, una imagen de portada). Repite por cada PDF
+   que quieras vender.
 5. En **Venta PDF → Ajustes** revisa el ambiente de Webpay, el SMTP, los
    textos del correo y los términos (aplican a todos los productos).
 6. Pon el shortcode que aparece junto a cada producto —
@@ -56,6 +57,17 @@ clave `123`.
 
 Cuando Transbank te entregue el código de comercio productivo, ingrésalo junto
 a la API Key en **Ajustes → General** y cambia el ambiente a **Producción**.
+
+## La tarjeta de compra
+
+Cada shortcode se ve como una tarjeta compacta (portada + nombre + precio +
+botón "Comprar ahora") pensada para no ocupar espacio de más en la página:
+al hacer clic se despliega el formulario completo (nombre, correo,
+términos). No usa JavaScript — es un `<details>` nativo del navegador, así
+que funciona igual en cualquier tema. Si el producto no tiene imagen, se
+muestra un ícono de documento como marcador de posición. Si el cliente
+comete un error al enviar el formulario (correo inválido, etc.), la tarjeta
+se abre sola mostrando el mensaje, en vez de dejarlo cerrado y oculto.
 
 ## Flujo
 
@@ -103,3 +115,7 @@ producto al momento de la compra. Por eso:
   ```
 
 - **Desinstalar** (no desactivar) borra opciones, ambas tablas y los PDF.
+- **Actualizar el plugin**: al reemplazar los archivos, el propio plugin
+  detecta en la siguiente visita si la versión instalada cambió y aplica
+  los ajustes de base de datos que falten (columnas o tablas nuevas) sin
+  necesitar desactivar/reactivar.

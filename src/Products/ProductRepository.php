@@ -15,7 +15,7 @@ final class ProductRepository
         $this->table = $wpdb->prefix . 'aep_products';
     }
 
-    public function create(string $name, int $price, string $pdfFile, bool $active): int
+    public function create(string $name, int $price, string $pdfFile, bool $active, string $imageUrl = ''): int
     {
         global $wpdb;
 
@@ -23,6 +23,7 @@ final class ProductRepository
             'name' => $name,
             'price' => $price,
             'pdf_file' => $pdfFile,
+            'image_url' => $imageUrl,
             'active' => $active ? 1 : 0,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
