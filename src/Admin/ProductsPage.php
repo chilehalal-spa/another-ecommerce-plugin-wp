@@ -210,8 +210,13 @@ final class ProductsPage
             }
 
             // Redirige la subida al directorio protegido en vez de uploads público.
-            $toProtected = static function (array $dirs): array {
-                $dirs['path'] = aep_protected_dir();
+            // La ruta se calcula ANTES de registrar el filtro: aep_protected_dir()
+            // llama a wp_upload_dir(), que a su vez dispara el filtro 'upload_dir';
+            // si se llamara dentro del closure, el filtro se relanzaría a sí mismo
+            // sin fin (recursión infinita hasta agotar la memoria de PHP).
+            $protectedDir = aep_protected_dir();
+            $toProtected = static function (array $dirs) use ($protectedDir): array {
+                $dirs['path'] = $protectedDir;
                 $dirs['url'] = '';
                 $dirs['subdir'] = '';
 
