@@ -155,10 +155,19 @@ final class ReturnController
 
     private function redirectFailure(?Order $order, string $reason): void
     {
-        $url = add_query_arg([
+        $args = [
             'aep_status' => 'failure',
             'aep_reason' => $reason,
-        ], $this->basePage($order));
+        ];
+
+        // Si conocemos la orden, incluimos su id para que la página sepa a
+        // qué producto pertenece este fracaso (una misma página puede tener
+        // varios botones "Comprar ahora", uno por producto).
+        if ($order !== null) {
+            $args['aep_order'] = $order->id;
+        }
+
+        $url = add_query_arg($args, $this->basePage($order));
 
         wp_safe_redirect($url);
         exit;

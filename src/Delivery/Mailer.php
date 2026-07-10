@@ -22,7 +22,7 @@ final class Mailer
 
         $replacements = [
             '{nombre}' => $order->customer_name,
-            '{producto}' => (string) SettingsPage::get('product_name'),
+            '{producto}' => $order->product_name,
             '{enlace}' => DownloadController::downloadUrl($order),
             '{horas}' => (string) max(1, (int) SettingsPage::get('link_hours')),
             '{descargas}' => (string) max(1, (int) SettingsPage::get('max_downloads')),

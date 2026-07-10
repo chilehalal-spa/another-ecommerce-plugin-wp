@@ -2,6 +2,7 @@
 
 namespace AnotherEcommerce;
 
+use AnotherEcommerce\Admin\ProductsPage;
 use AnotherEcommerce\Admin\SettingsPage;
 use AnotherEcommerce\Delivery\DownloadController;
 use AnotherEcommerce\Delivery\Mailer;
@@ -9,12 +10,15 @@ use AnotherEcommerce\Http\CheckoutController;
 use AnotherEcommerce\Http\ReturnController;
 use AnotherEcommerce\Orders\OrderRepository;
 use AnotherEcommerce\Payment\WebpayGateway;
+use AnotherEcommerce\Products\ProductRepository;
 
 /**
  * Orquestador del plugin: registra hooks y arma las dependencias.
  *
  * Flujo de compra:
- *  1. Shortcode [aep_comprar] muestra el formulario (templates/form.php).
+ *  1. Shortcode [aep_comprar id="N"] muestra el formulario de ese producto
+ *     (templates/form.php). Cada producto tiene su propio botón "Comprar
+ *     ahora"; no hay carrito ni catálogo compartido.
  *  2. El POST llega a admin-post.php (action aep_checkout) -> CheckoutController.
  *  3. Webpay redirige de vuelta a ?aep-action=webpay-return -> ReturnController.
  *  4. La descarga se sirve en ?aep-action=download -> DownloadController.
@@ -24,6 +28,7 @@ final class Plugin
     private static ?self $instance = null;
 
     private OrderRepository $orders;
+    private ProductRepository $products;
     private WebpayGateway $gateway;
     private Mailer $mailer;
 
@@ -39,12 +44,17 @@ final class Plugin
     private function __construct()
     {
         $this->orders = new OrderRepository();
+        $this->products = new ProductRepository();
         $this->gateway = new WebpayGateway();
         $this->mailer = new Mailer();
 
+        // Registrado siempre (no solo en admin): los correos de compra se
+        // envían desde el frontend y deben pasar por el SMTP configurado.
+        add_action('phpmailer_init', [SettingsPage::class, 'configurePhpMailer']);
+
         add_shortcode('aep_comprar', [$this, 'renderShortcode']);
 
-        $checkout = new CheckoutController($this->orders, $this->gateway);
+        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products);
         add_action('admin_post_nopriv_aep_checkout', [$checkout, 'handle']);
         add_action('admin_post_aep_checkout', [$checkout, 'handle']);
 
@@ -53,10 +63,16 @@ final class Plugin
         if (is_admin()) {
             $settings = new SettingsPage($this->orders, $this->mailer);
             add_action('admin_menu', [$settings, 'registerMenu']);
-            add_action('admin_init', [$settings, 'registerSettings']);
-            add_action('admin_post_aep_upload_pdf', [$settings, 'handlePdfUpload']);
+            add_action('admin_post_aep_save_settings', [$settings, 'handleSaveSettings']);
+            add_action('admin_post_aep_send_test_email', [$settings, 'handleSendTestEmail']);
             add_action('admin_post_aep_resend_email', [$settings, 'handleResendEmail']);
             add_action('admin_notices', [$settings, 'maybeShowSdkNotice']);
+
+            $productsPage = new ProductsPage($this->products);
+            add_action('admin_menu', [$productsPage, 'registerMenu']);
+            add_action('admin_post_aep_save_product', [$productsPage, 'handleSave']);
+            add_action('admin_post_aep_toggle_product', [$productsPage, 'handleToggle']);
+            add_action('admin_post_aep_delete_product', [$productsPage, 'handleDelete']);
         }
     }
 
@@ -82,18 +98,46 @@ final class Plugin
     }
 
     /**
-     * El shortcode muestra el formulario de compra o, si venimos de vuelta
-     * de Webpay (aep_status en la URL), la página de éxito/fracaso.
+     * El shortcode muestra el formulario de compra de un producto, o si
+     * venimos de vuelta de Webpay para ESE producto (aep_status en la URL),
+     * la página de éxito/fracaso. Una misma página puede tener varios
+     * shortcodes (uno por producto); el estado de retorno solo se muestra
+     * en el que corresponde, los demás siguen mostrando su formulario.
      */
-    public function renderShortcode(): string
+    public function renderShortcode($atts = []): string
     {
-        $status = isset($_GET['aep_status']) ? sanitize_key(wp_unslash($_GET['aep_status'])) : '';
+        $atts = shortcode_atts(['id' => 0], is_array($atts) ? $atts : [], 'aep_comprar');
+        $productId = absint($atts['id']);
 
-        if ($status === 'success') {
-            return $this->renderSuccess();
+        if ($productId <= 0) {
+            return current_user_can(SettingsPage::CAPABILITY)
+                ? '<p style="color:#b00;">[aep_comprar] necesita el id del producto, por ejemplo: [aep_comprar id="1"]</p>'
+                : '';
         }
 
-        if ($status === 'failure') {
+        $product = $this->products->findById($productId);
+        if ($product === null || !$product->active) {
+            return current_user_can(SettingsPage::CAPABILITY)
+                ? '<p style="color:#b00;">Producto no disponible (id ' . esc_html((string) $productId) . ').</p>'
+                : '';
+        }
+
+        $status = isset($_GET['aep_status']) ? sanitize_key(wp_unslash($_GET['aep_status'])) : '';
+        $orderId = isset($_GET['aep_order']) ? absint($_GET['aep_order']) : 0;
+        $order = $orderId > 0 ? $this->orders->findById($orderId) : null;
+
+        if ($status === 'success' && $order !== null && $order->product_id === $productId) {
+            $key = isset($_GET['aep_key']) ? sanitize_text_field(wp_unslash($_GET['aep_key'])) : '';
+            if ($order->status === 'paid' && hash_equals($order->download_token, $key)) {
+                return self::renderTemplate('success', [
+                    'order' => $order,
+                    'settings' => SettingsPage::all(),
+                    'download_url' => DownloadController::downloadUrl($order),
+                ]);
+            }
+        }
+
+        if ($status === 'failure' && ($orderId === 0 || ($order !== null && $order->product_id === $productId))) {
             $reason = isset($_GET['aep_reason']) ? sanitize_key(wp_unslash($_GET['aep_reason'])) : '';
 
             return self::renderTemplate('failure', [
@@ -101,40 +145,17 @@ final class Plugin
             ]);
         }
 
-        $error = isset($_GET['aep_error']) ? sanitize_key(wp_unslash($_GET['aep_error'])) : '';
+        // El error del checkout (nombre inválido, etc.) también viaja atado
+        // al producto para no mostrarlo en el formulario equivocado.
+        $requestedProductId = isset($_GET['aep_product_id']) ? absint($_GET['aep_product_id']) : 0;
+        $error = isset($_GET['aep_error']) && $requestedProductId === $productId
+            ? sanitize_key(wp_unslash($_GET['aep_error']))
+            : '';
 
         return self::renderTemplate('form', [
+            'product' => $product,
             'settings' => SettingsPage::all(),
             'error_message' => CheckoutController::errorMessage($error),
-            'page_url' => get_permalink() ?: home_url('/'),
-        ]);
-    }
-
-    private function renderSuccess(): string
-    {
-        $orderId = isset($_GET['aep_order']) ? absint($_GET['aep_order']) : 0;
-        $key = isset($_GET['aep_key']) ? sanitize_text_field(wp_unslash($_GET['aep_key'])) : '';
-
-        $order = $orderId > 0 ? $this->orders->findById($orderId) : null;
-
-        // La clave de la URL debe coincidir con el token de descarga de la orden
-        // pagada; si no, alguien está adivinando URLs y solo ve el formulario.
-        if ($order === null || $order->status !== 'paid' || !hash_equals($order->download_token, $key)) {
-            return $this->renderFormFallback();
-        }
-
-        return self::renderTemplate('success', [
-            'order' => $order,
-            'settings' => SettingsPage::all(),
-            'download_url' => DownloadController::downloadUrl($order),
-        ]);
-    }
-
-    private function renderFormFallback(): string
-    {
-        return self::renderTemplate('form', [
-            'settings' => SettingsPage::all(),
-            'error_message' => '',
             'page_url' => get_permalink() ?: home_url('/'),
         ]);
     }

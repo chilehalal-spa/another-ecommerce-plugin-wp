@@ -1,9 +1,13 @@
 # Another Ecommerce Plugin
 
-Plugin de WordPress para vender **un único PDF** con botón **"Comprar ahora"**:
-sin carrito, sin registro de usuarios, pago con **Webpay Plus (Transbank)** y
+Plugin de WordPress para vender **PDFs** con botón **"Comprar ahora"**: sin
+carrito, sin registro de usuarios, pago con **Webpay Plus (Transbank)** y
 entrega por correo con un enlace de descarga temporal. Sin reembolsos (el
 cliente acepta términos con renuncia expresa al retracto antes de pagar).
+
+Puedes vender **varios productos**: cada uno es un PDF independiente, con su
+propio nombre, precio y botón de compra propio (no hay carrito ni catálogo
+compartido — cada shortcode vende un único artículo).
 
 ## Instalación
 
@@ -15,11 +19,32 @@ cliente acepta términos con renuncia expresa al retracto antes de pagar).
    ```
 
    Esto instala el SDK oficial de Transbank. Si falta, el admin muestra un aviso.
-3. Activa el plugin en **Plugins** (crea la tabla `wp_aep_orders` y el
-   directorio protegido `wp-content/uploads/aep-protected/`).
-4. En **Venta PDF → Ajustes**: define nombre del producto, precio en CLP,
-   sube el PDF y revisa los textos del correo y de los términos.
-5. Pon el shortcode `[aep_comprar]` en la página donde quieras vender.
+3. Activa el plugin en **Plugins** (crea las tablas `wp_aep_orders` y
+   `wp_aep_products`, y el directorio protegido `wp-content/uploads/aep-protected/`).
+4. En **Venta PDF → Productos**: crea un producto (nombre, precio en CLP,
+   sube el PDF). Repite por cada PDF que quieras vender.
+5. En **Venta PDF → Ajustes** revisa el ambiente de Webpay, el SMTP, los
+   textos del correo y los términos (aplican a todos los productos).
+6. Pon el shortcode que aparece junto a cada producto —
+   `[aep_comprar id="N"]` — en la página donde quieras ese botón de compra.
+   Puedes poner varios shortcodes (uno por producto) en la misma página.
+
+## Ajustes por pestañas
+
+La pantalla **Venta PDF → Ajustes** se organiza en pestañas, cada una con su
+propio botón "Guardar" (guardar una pestaña no afecta a las demás):
+
+- **General**: ambiente de Webpay (integración/producción), código de
+  comercio y API Key.
+- **Entrega**: vigencia del enlace de descarga (horas) y máximo de descargas
+  por compra.
+- **SMTP**: servidor, puerto, cifrado, usuario/contraseña y remitente para
+  enviar los correos por SMTP en vez de la función `mail()` de PHP (más
+  confiable, menos spam). Incluye un botón para enviar un correo de prueba.
+- **Correo**: asunto y cuerpo del correo de entrega (con variables como
+  `{producto}`, `{enlace}`, `{nombre}`).
+- **Términos**: el texto de renuncia al retracto que el cliente acepta antes
+  de pagar.
 
 ## Probar sin tener aún el contrato de Webpay
 
@@ -30,12 +55,15 @@ fecha de expiración; en el paso de autenticación usa RUT `11.111.111-1` y
 clave `123`.
 
 Cuando Transbank te entregue el código de comercio productivo, ingrésalo junto
-a la API Key en los ajustes y cambia el ambiente a **Producción**.
+a la API Key en **Ajustes → General** y cambia el ambiente a **Producción**.
 
 ## Flujo
 
-1. El cliente completa nombre + correo (con confirmación) y acepta los términos.
-2. Se crea la orden (`pending`) y se le redirige a Webpay.
+1. El cliente completa nombre + correo (con confirmación) y acepta los términos
+   en el formulario del producto elegido.
+2. Se crea la orden (`pending`) copiando el nombre, precio y PDF del producto
+   *en ese momento* (si luego editas el producto, las órdenes ya creadas no
+   cambian), y se redirige al cliente a Webpay.
 3. Al volver de Webpay se confirma el pago (`commit`, idempotente ante
    refresh/doble clic) y la orden queda `paid`, `failed` o `aborted`.
 4. Si el pago fue aprobado: se genera un enlace de descarga con token,
@@ -44,14 +72,29 @@ a la API Key en los ajustes y cambia el ambiente a **Producción**.
 5. El PDF se sirve por streaming desde el directorio protegido; nunca tiene
    URL pública.
 
-En **Venta PDF → Ventas** se listan las órdenes (con código de autorización y
-últimos 4 dígitos de la tarjeta) y se puede **reenviar el correo** con un
-enlace nuevo si al cliente se le venció.
+En **Venta PDF → Ventas** se listan las órdenes (producto comprado, código de
+autorización y últimos 4 dígitos de la tarjeta) y se puede **reenviar el
+correo** con un enlace nuevo si al cliente se le venció.
+
+### Editar o eliminar un producto no rompe compras anteriores
+
+Cada orden guarda su propia copia del nombre, precio y nombre de archivo del
+producto al momento de la compra. Por eso:
+
+- Subir un PDF nuevo para reemplazar el de un producto **no borra el
+  archivo anterior**: los compradores previos siguen pudiendo descargar la
+  versión que compraron.
+- **Eliminar** un producto solo quita la fila de la lista (y evita nuevas
+  compras); el PDF permanece en el servidor para no romper enlaces de
+  descarga ya entregados. Usa **Desactivar** si solo quieres dejar de vender
+  el producto sin eliminarlo.
 
 ## Notas de despliegue
 
-- **Correo**: configura un plugin SMTP (p. ej. WP Mail SMTP); `wp_mail()` con
-  PHP `mail()` suele caer en spam y el correo es tu canal de entrega.
+- **Correo**: configura la pestaña **Ajustes → SMTP** con los datos de tu
+  proveedor (o un plugin SMTP externo si prefieres); `wp_mail()` con la
+  función `mail()` de PHP suele caer en spam y el correo es tu único canal
+  de entrega.
 - **nginx**: el bloqueo del directorio protegido usa `.htaccess` (Apache). En
   nginx agrega a tu server block:
 
@@ -59,4 +102,4 @@ enlace nuevo si al cliente se le venció.
   location ~* /uploads/aep-protected/ { deny all; }
   ```
 
-- **Desinstalar** (no desactivar) borra opciones, tabla de órdenes y el PDF.
+- **Desinstalar** (no desactivar) borra opciones, ambas tablas y los PDF.

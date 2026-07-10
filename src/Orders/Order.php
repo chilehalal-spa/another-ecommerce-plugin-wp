@@ -18,6 +18,9 @@ final class Order
     public string $status = 'pending';
     public string $customer_name = '';
     public string $customer_email = '';
+    public int $product_id = 0;
+    public string $product_name = '';
+    public string $pdf_file = '';
     public int $amount = 0;
     public string $authorization_code = '';
     public string $payment_type = '';
@@ -38,6 +41,9 @@ final class Order
         $order->status = (string) $row->status;
         $order->customer_name = (string) $row->customer_name;
         $order->customer_email = (string) $row->customer_email;
+        $order->product_id = (int) $row->product_id;
+        $order->product_name = (string) $row->product_name;
+        $order->pdf_file = (string) $row->pdf_file;
         $order->amount = (int) $row->amount;
         $order->authorization_code = (string) $row->authorization_code;
         $order->payment_type = (string) $row->payment_type;

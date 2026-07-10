@@ -54,22 +54,29 @@ final class DownloadController
             $this->deny(410, 'Alcanzaste el límite de descargas de este enlace. Escríbenos si necesitas ayuda.');
         }
 
-        $file = self::pdfPath();
+        $file = self::pdfPath($order);
         if ($file === null) {
             $this->deny(500, 'El archivo no está disponible en este momento. Escríbenos para solucionarlo.');
         }
 
         $this->orders->incrementDownloads($order->id);
-        $this->stream($file);
+        $this->stream($file, $order);
     }
 
     /**
-     * Ruta absoluta del PDF configurado dentro del directorio protegido,
-     * o null si no existe. basename() evita cualquier path traversal.
+     * Ruta absoluta del PDF de la orden (el nombre de archivo que quedó
+     * guardado en la orden al comprar, no el del producto en vivo) dentro
+     * del directorio protegido, o null si no existe. basename() evita
+     * cualquier path traversal.
      */
-    public static function pdfPath(): ?string
+    public static function pdfPath(Order $order): ?string
     {
-        $filename = basename((string) SettingsPage::get('pdf_file'));
+        return self::resolveFile($order->pdf_file);
+    }
+
+    public static function resolveFile(string $filename): ?string
+    {
+        $filename = basename($filename);
         if ($filename === '') {
             return null;
         }
@@ -79,9 +86,9 @@ final class DownloadController
         return is_readable($path) ? $path : null;
     }
 
-    private function stream(string $file): void
+    private function stream(string $file, Order $order): void
     {
-        $downloadName = sanitize_file_name((string) SettingsPage::get('product_name'));
+        $downloadName = sanitize_file_name($order->product_name);
         $downloadName = ($downloadName !== '' ? $downloadName : 'documento') . '.pdf';
 
         nocache_headers();

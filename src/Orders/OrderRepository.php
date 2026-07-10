@@ -2,6 +2,8 @@
 
 namespace AnotherEcommerce\Orders;
 
+use AnotherEcommerce\Products\Product;
+
 /**
  * Persistencia de órdenes en la tabla propia {prefix}aep_orders.
  */
@@ -15,7 +17,12 @@ final class OrderRepository
         $this->table = $wpdb->prefix . 'aep_orders';
     }
 
-    public function create(string $name, string $email, int $amount, string $pageUrl): ?Order
+    /**
+     * Crea la orden copiando nombre, precio y archivo del producto tal como
+     * estaban al momento de la compra (snapshot): si luego el producto se
+     * edita, renombra o elimina, esta orden y su descarga siguen intactas.
+     */
+    public function create(string $name, string $email, Product $product, string $pageUrl): ?Order
     {
         global $wpdb;
 
@@ -25,7 +32,10 @@ final class OrderRepository
             'status' => 'pending',
             'customer_name' => $name,
             'customer_email' => $email,
-            'amount' => $amount,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'pdf_file' => $product->pdf_file,
+            'amount' => $product->price,
             'page_url' => $pageUrl,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
