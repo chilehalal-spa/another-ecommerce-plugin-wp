@@ -22,19 +22,15 @@ $aep_open = $error_message !== '';
 ?>
 <details class="aep-box" id="aep-comprar-<?php echo esc_attr($aep_uid); ?>" <?php echo $aep_open ? 'open' : ''; ?>>
     <summary class="aep-summary">
-        <span class="aep-summary-top">
-            <span class="aep-cover">
-                <?php if ($product->image_url !== '') : ?>
-                    <img src="<?php echo esc_url($product->image_url); ?>" alt="">
-                <?php else : ?>
-                    <span class="aep-cover-placeholder" aria-hidden="true">📄</span>
-                <?php endif; ?>
-            </span>
-            <span class="aep-info">
-                <span class="aep-title"><?php echo esc_html($product->name); ?></span>
-                <span class="aep-price">$<?php echo esc_html($aep_price); ?> <small>CLP</small></span>
-            </span>
+        <span class="aep-header">
+            <span class="aep-title"><?php echo esc_html($product->name); ?></span>
+            <span class="aep-price">$<?php echo esc_html($aep_price); ?> <small>CLP</small></span>
         </span>
+        <?php if ($product->image_url !== '') : ?>
+            <span class="aep-cover">
+                <img src="<?php echo esc_url($product->image_url); ?>" alt="">
+            </span>
+        <?php endif; ?>
         <span class="aep-cta">
             Comprar ahora
             <svg class="aep-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -94,20 +90,18 @@ $aep_open = $error_message !== '';
         max-width: 420px; margin: 1em auto; border: 1px solid #ddd; border-radius: 12px;
         overflow: hidden; background: #fff;
     }
-    .aep-box summary.aep-summary { list-style: none; cursor: pointer; }
+    .aep-box summary.aep-summary { list-style: none; cursor: pointer; display: block; }
     .aep-box summary.aep-summary::-webkit-details-marker,
     .aep-box summary.aep-summary::marker { display: none; content: ""; }
-    .aep-box .aep-summary-top { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+    .aep-box .aep-header { display: block; padding: 16px 18px 12px; }
+    .aep-box .aep-title { display: block; font-weight: 700; font-size: 1.1em; line-height: 1.3; }
+    .aep-box .aep-price { display: block; margin-top: 4px; font-weight: 700; color: #1a7f37; }
+    .aep-box .aep-price small { font-weight: 400; color: #555; }
     .aep-box .aep-cover {
-        flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px; overflow: hidden;
-        background: #f2f2f2; display: flex; align-items: center; justify-content: center;
+        display: block; width: 100%; aspect-ratio: 16 / 8; overflow: hidden;
+        background: #f2f2f2;
     }
     .aep-box .aep-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .aep-box .aep-cover-placeholder { font-size: 1.7em; }
-    .aep-box .aep-info { min-width: 0; }
-    .aep-box .aep-title { display: block; font-weight: 700; font-size: 1.05em; line-height: 1.3; }
-    .aep-box .aep-price { display: block; margin-top: 2px; font-weight: 700; color: #1a7f37; }
-    .aep-box .aep-price small { font-weight: 400; color: #555; }
     .aep-box .aep-cta {
         display: flex; align-items: center; justify-content: center; gap: 6px;
         padding: 13px 16px; background: #1a7f37; color: #fff; font-weight: 700; text-align: center;
