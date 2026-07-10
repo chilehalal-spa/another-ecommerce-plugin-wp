@@ -97,11 +97,8 @@ $aep_open = $error_message !== '';
     .aep-box .aep-title { display: block; font-weight: 700; font-size: 1.1em; line-height: 1.3; }
     .aep-box .aep-price { display: block; margin-top: 4px; font-weight: 700; color: #1a7f37; }
     .aep-box .aep-price small { font-weight: 400; color: #555; }
-    .aep-box .aep-cover {
-        display: block; width: 100%; aspect-ratio: 16 / 8; overflow: hidden;
-        background: #f2f2f2;
-    }
-    .aep-box .aep-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .aep-box .aep-cover { display: block; width: 100%; background: #f2f2f2; }
+    .aep-box .aep-cover img { display: block; width: 100%; height: auto; }
     .aep-box .aep-cta {
         display: flex; align-items: center; justify-content: center; gap: 6px;
         padding: 13px 16px; background: #1a7f37; color: #fff; font-weight: 700; text-align: center;
