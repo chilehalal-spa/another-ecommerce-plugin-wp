@@ -113,7 +113,7 @@ $aep_open = $error_message !== '';
     .aep-box .aep-field input { width: 100%; padding: 8px 10px; border: 1px solid #bbb; border-radius: 6px; box-sizing: border-box; }
     .aep-box .aep-field small { color: #666; }
     .aep-box .aep-hp { position: absolute; left: -9999px; }
-    .aep-box .aep-terms { font-size: 0.85em; color: #444; }
+    .aep-box .aep-terms { font-size: 0.72em; line-height: 1.4; color: #777; }
     .aep-box .aep-button { width: 100%; padding: 14px; font-size: 1.05em; font-weight: 700; color: #fff; background: #1a7f37; border: 0; border-radius: 8px; cursor: pointer; }
     .aep-box .aep-button:hover { background: #166b2f; }
 </style>
