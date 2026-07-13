@@ -70,20 +70,15 @@ final class SettingsPage
         return self::all()[$key] ?? null;
     }
 
+    /**
+     * El menú de nivel superior lo crea ProductsPage (Productos es la
+     * primera pantalla); aquí solo agregamos Ventas y Ajustes como
+     * submenús de ese mismo padre, en ese orden.
+     */
     public function registerMenu(): void
     {
-        add_menu_page(
-            'Venta PDF',
-            'Venta PDF',
-            self::CAPABILITY,
-            self::MENU_SLUG,
-            [$this, 'renderSettingsPage'],
-            'dashicons-media-document',
-            56
-        );
-
-        add_submenu_page(self::MENU_SLUG, 'Ajustes', 'Ajustes', self::CAPABILITY, self::MENU_SLUG, [$this, 'renderSettingsPage']);
-        add_submenu_page(self::MENU_SLUG, 'Ventas', 'Ventas', self::CAPABILITY, self::ORDERS_SLUG, [$this, 'renderOrdersPage']);
+        add_submenu_page(ProductsPage::SLUG, 'Ventas', 'Ventas', self::CAPABILITY, self::ORDERS_SLUG, [$this, 'renderOrdersPage']);
+        add_submenu_page(ProductsPage::SLUG, 'Ajustes', 'Ajustes', self::CAPABILITY, self::MENU_SLUG, [$this, 'renderSettingsPage']);
     }
 
     public function maybeShowSdkNotice(): void

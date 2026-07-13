@@ -18,9 +18,25 @@ final class ProductsPage
     {
     }
 
+    /**
+     * Dueño del menú de nivel superior "Venta PDF": Productos es lo primero
+     * que se administra (qué se vende), así que es la página de entrada.
+     * Ventas y Ajustes (registradas por SettingsPage) se agregan como
+     * submenús del mismo padre, en ese orden.
+     */
     public function registerMenu(): void
     {
-        add_submenu_page(SettingsPage::MENU_SLUG, 'Productos', 'Productos', self::CAPABILITY, self::SLUG, [$this, 'render']);
+        add_menu_page(
+            'Venta PDF',
+            'Venta PDF',
+            self::CAPABILITY,
+            self::SLUG,
+            [$this, 'render'],
+            'dashicons-media-document',
+            56
+        );
+
+        add_submenu_page(self::SLUG, 'Productos', 'Productos', self::CAPABILITY, self::SLUG, [$this, 'render']);
     }
 
     public function render(): void

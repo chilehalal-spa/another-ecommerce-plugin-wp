@@ -66,18 +66,22 @@ final class Plugin
         add_action('template_redirect', [$this, 'routeFrontActions']);
 
         if (is_admin()) {
+            // ProductsPage se registra primero: es dueña del menú de nivel
+            // superior y del primer submenú (Productos). El orden en que se
+            // registran los hooks admin_menu es el orden en que aparecen los
+            // submenús, así que SettingsPage (Ventas, Ajustes) va después.
+            $productsPage = new ProductsPage($this->products);
+            add_action('admin_menu', [$productsPage, 'registerMenu']);
+            add_action('admin_post_aep_save_product', [$productsPage, 'handleSave']);
+            add_action('admin_post_aep_toggle_product', [$productsPage, 'handleToggle']);
+            add_action('admin_post_aep_delete_product', [$productsPage, 'handleDelete']);
+
             $settings = new SettingsPage($this->orders, $this->mailer);
             add_action('admin_menu', [$settings, 'registerMenu']);
             add_action('admin_post_aep_save_settings', [$settings, 'handleSaveSettings']);
             add_action('admin_post_aep_send_test_email', [$settings, 'handleSendTestEmail']);
             add_action('admin_post_aep_resend_email', [$settings, 'handleResendEmail']);
             add_action('admin_notices', [$settings, 'maybeShowSdkNotice']);
-
-            $productsPage = new ProductsPage($this->products);
-            add_action('admin_menu', [$productsPage, 'registerMenu']);
-            add_action('admin_post_aep_save_product', [$productsPage, 'handleSave']);
-            add_action('admin_post_aep_toggle_product', [$productsPage, 'handleToggle']);
-            add_action('admin_post_aep_delete_product', [$productsPage, 'handleDelete']);
         }
     }
 
