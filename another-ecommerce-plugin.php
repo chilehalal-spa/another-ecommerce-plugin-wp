@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AEP_VERSION', '1.0.0');
+define('AEP_VERSION', '1.1.0');
 define('AEP_FILE', __FILE__);
 define('AEP_DIR', plugin_dir_path(__FILE__));
 define('AEP_URL', plugin_dir_url(__FILE__));
@@ -30,12 +30,10 @@ function aep_protected_dir(): string
     return trailingslashit($uploads['basedir']) . 'aep-protected';
 }
 
-// Autoloader de Composer (trae el SDK de Transbank).
 if (file_exists(AEP_DIR . 'vendor/autoload.php')) {
     require_once AEP_DIR . 'vendor/autoload.php';
 }
 
-// Autoloader propio de respaldo para las clases del plugin.
 spl_autoload_register(static function (string $class): void {
     if (!str_starts_with($class, 'AnotherEcommerce\\')) {
         return;

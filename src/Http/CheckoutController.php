@@ -82,7 +82,6 @@ final class CheckoutController
 
         $this->orders->update($order->id, ['token_ws' => $result['token']]);
 
-        // Redirección por GET al formulario de pago de Webpay.
         wp_redirect($result['url'] . '?token_ws=' . rawurlencode($result['token']));
         exit;
     }

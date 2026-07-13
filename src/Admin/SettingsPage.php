@@ -352,10 +352,6 @@ final class SettingsPage
         };
     }
 
-    /**
-     * Guarda una pestaña de ajustes vía admin-post, delegando la fusión a
-     * sanitizeTab().
-     */
     public function handleSaveSettings(): void
     {
         if (!current_user_can(self::CAPABILITY)) {
