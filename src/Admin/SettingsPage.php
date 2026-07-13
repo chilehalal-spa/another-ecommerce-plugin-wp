@@ -30,6 +30,8 @@ final class SettingsPage
         'terms' => 'Términos',
     ];
 
+    private string $settingsHook = '';
+
     public function __construct(
         private OrderRepository $orders,
         private Mailer $mailer,
@@ -53,8 +55,8 @@ final class SettingsPage
             'smtp_from_email' => '',
             'smtp_from_name' => '',
             'email_subject' => 'Tu compra: {producto}',
-            'email_body' => "Hola {nombre}:\n\n¡Gracias por tu compra! (orden {orden}).\n\nDescarga tu copia de \"{producto}\" con el botón de abajo. El enlace es personal, vence en {horas} horas y admite hasta {descargas} descargas.\n\nSi tienes cualquier problema, responde este correo.",
-            'terms_text' => 'Al comprar aceptas la entrega inmediata del contenido digital y renuncias expresamente al derecho de retracto (art. 3 bis letra b, Ley 19.496). Esta compra no admite reembolsos.',
+            'email_body' => '<p>Hola {nombre}:</p><p>¡Gracias por tu compra! (orden {orden}).</p><p>Descarga tu copia de &#8220;{producto}&#8221; con el botón de abajo. El enlace es personal, vence en {horas} horas y admite hasta {descargas} descargas.</p><p>Si tienes cualquier problema, responde este correo.</p>',
+            'terms_text' => '<p>Al comprar aceptas la entrega inmediata del contenido digital y renuncias expresamente al derecho de retracto (art. 3 bis letra b, Ley 19.496). Esta compra no admite reembolsos.</p>',
         ];
     }
 
@@ -78,7 +80,21 @@ final class SettingsPage
     public function registerMenu(): void
     {
         add_submenu_page(ProductsPage::SLUG, 'Ventas', 'Ventas', self::CAPABILITY, self::ORDERS_SLUG, [$this, 'renderOrdersPage']);
-        add_submenu_page(ProductsPage::SLUG, 'Ajustes', 'Ajustes', self::CAPABILITY, self::MENU_SLUG, [$this, 'renderSettingsPage']);
+
+        $hook = add_submenu_page(ProductsPage::SLUG, 'Ajustes', 'Ajustes', self::CAPABILITY, self::MENU_SLUG, [$this, 'renderSettingsPage']);
+        $this->settingsHook = $hook !== false ? $hook : '';
+    }
+
+    /**
+     * El editor de texto enriquecido (pestañas Correo y Términos) necesita
+     * los scripts de TinyMCE, que no se cargan solos en una página de admin
+     * fuera de la pantalla de edición de entradas.
+     */
+    public function enqueueEditorAssets(string $hook): void
+    {
+        if ($hook === $this->settingsHook) {
+            wp_enqueue_editor();
+        }
     }
 
     public function maybeShowSdkNotice(): void
@@ -166,6 +182,27 @@ final class SettingsPage
             <?php submit_button('Guardar ajustes'); ?>
         </form>
         <?php
+    }
+
+    /**
+     * Editor enriquecido (negrita, cursiva, tamaño de fuente) para los
+     * campos de texto que se muestran al cliente. El contenido se guarda
+     * como HTML y se sanitiza con wp_kses_post(), igual que el contenido
+     * de una entrada normal de WordPress.
+     */
+    private function richTextEditor(string $fieldName, string $content): void
+    {
+        wp_editor($content, 'aep_' . $fieldName . '_editor', [
+            'textarea_name' => $fieldName,
+            'textarea_rows' => 8,
+            'media_buttons' => false,
+            'quicktags' => true,
+            'tinymce' => [
+                'toolbar1' => 'bold,italic,underline,forecolor,fontsizeselect,bullist,numlist,alignleft,aligncenter,alignright,link,unlink,removeformat,undo,redo',
+                'toolbar2' => '',
+                'fontsize_formats' => '12px 14px 16px 18px 24px 32px',
+            ],
+        ]);
     }
 
     private function renderGeneralTab(array $s): void
@@ -283,9 +320,9 @@ final class SettingsPage
             <td><input type="text" id="aep-email-subject" class="large-text" name="email_subject" value="<?php echo esc_attr($s['email_subject']); ?>"></td>
         </tr>
         <tr>
-            <th scope="row"><label for="aep-email-body">Cuerpo del correo</label></th>
+            <th scope="row"><label for="aep_email_body_editor">Cuerpo del correo</label></th>
             <td>
-                <textarea id="aep-email-body" class="large-text" rows="8" name="email_body"><?php echo esc_textarea($s['email_body']); ?></textarea>
+                <?php $this->richTextEditor('email_body', $s['email_body']); ?>
                 <p class="description">Variables disponibles: <code>{nombre}</code>, <code>{producto}</code>, <code>{enlace}</code>, <code>{horas}</code>, <code>{descargas}</code>, <code>{orden}</code>. El botón de descarga se agrega solo.</p>
             </td>
         </tr>
@@ -298,9 +335,9 @@ final class SettingsPage
         $this->tabFormStart('terms');
         ?>
         <tr>
-            <th scope="row"><label for="aep-terms-text">Términos de compra (sin reembolso)</label></th>
+            <th scope="row"><label for="aep_terms_text_editor">Términos de compra (sin reembolso)</label></th>
             <td>
-                <textarea id="aep-terms-text" class="large-text" rows="4" name="terms_text"><?php echo esc_textarea($s['terms_text']); ?></textarea>
+                <?php $this->richTextEditor('terms_text', $s['terms_text']); ?>
                 <p class="description">Se muestran junto al checkbox obligatorio en el formulario de compra de cada producto.</p>
             </td>
         </tr>
@@ -343,10 +380,13 @@ final class SettingsPage
             ]),
             'email' => array_merge($current, [
                 'email_subject' => sanitize_text_field($post['email_subject'] ?? $current['email_subject']),
-                'email_body' => sanitize_textarea_field($post['email_body'] ?? $current['email_body']),
+                // wp_kses_post (no sanitize_textarea_field): estos campos ahora
+                // se editan con un editor enriquecido y guardan HTML seguro
+                // (negrita, tamaño de fuente, etc.), igual que el contenido de una entrada.
+                'email_body' => wp_kses_post($post['email_body'] ?? $current['email_body']),
             ]),
             'terms' => array_merge($current, [
-                'terms_text' => sanitize_textarea_field($post['terms_text'] ?? $current['terms_text']),
+                'terms_text' => wp_kses_post($post['terms_text'] ?? $current['terms_text']),
             ]),
             default => $current,
         };

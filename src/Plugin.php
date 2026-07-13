@@ -78,6 +78,7 @@ final class Plugin
 
             $settings = new SettingsPage($this->orders, $this->mailer);
             add_action('admin_menu', [$settings, 'registerMenu']);
+            add_action('admin_enqueue_scripts', [$settings, 'enqueueEditorAssets']);
             add_action('admin_post_aep_save_settings', [$settings, 'handleSaveSettings']);
             add_action('admin_post_aep_send_test_email', [$settings, 'handleSendTestEmail']);
             add_action('admin_post_aep_resend_email', [$settings, 'handleResendEmail']);

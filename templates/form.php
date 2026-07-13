@@ -76,7 +76,7 @@ $aep_open = $error_message !== '';
             <p class="aep-terms">
                 <label>
                     <input type="checkbox" name="aep_terms" value="1" required>
-                    <span><?php echo esc_html($settings['terms_text']); ?></span>
+                    <span class="aep-terms-text"><?php echo wp_kses_post($settings['terms_text']); ?></span>
                 </label>
             </p>
 
@@ -114,6 +114,7 @@ $aep_open = $error_message !== '';
     .aep-box .aep-field small { color: #666; }
     .aep-box .aep-hp { position: absolute; left: -9999px; }
     .aep-box .aep-terms { font-size: 0.72em; line-height: 1.4; color: #777; }
+    .aep-box .aep-terms-text p { display: inline; margin: 0; }
     .aep-box .aep-button { width: 100%; padding: 14px; font-size: 1.05em; font-weight: 700; color: #fff; background: #1a7f37; border: 0; border-radius: 8px; cursor: pointer; }
     .aep-box .aep-button:hover { background: #166b2f; }
 </style>

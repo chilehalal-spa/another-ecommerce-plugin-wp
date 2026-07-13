@@ -33,7 +33,7 @@ final class Mailer
         $body = strtr($body, $replacements);
 
         $html = '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;line-height:1.6;">'
-            . wpautop(esc_html($body))
+            . wpautop(wp_kses_post($body))
             . '<p style="margin-top:24px;"><a href="' . esc_url($replacements['{enlace}']) . '" '
             . 'style="background:#1a7f37;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">'
             . esc_html__('Descargar mi PDF', 'another-ecommerce-plugin') . '</a></p>'

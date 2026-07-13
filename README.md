@@ -43,9 +43,10 @@ propio botón "Guardar" (guardar una pestaña no afecta a las demás):
   enviar los correos por SMTP en vez de la función `mail()` de PHP (más
   confiable, menos spam). Incluye un botón para enviar un correo de prueba.
 - **Correo**: asunto y cuerpo del correo de entrega (con variables como
-  `{producto}`, `{enlace}`, `{nombre}`).
+  `{producto}`, `{enlace}`, `{nombre}`). El cuerpo se edita con el mismo
+  editor enriquecido de WordPress (negrita, cursiva, tamaño de fuente, etc.).
 - **Términos**: el texto de renuncia al retracto que el cliente acepta antes
-  de pagar.
+  de pagar, con el mismo editor enriquecido.
 
 ## Probar sin tener aún el contrato de Webpay
 
