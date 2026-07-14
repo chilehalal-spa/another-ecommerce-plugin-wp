@@ -9,6 +9,7 @@ use AnotherEcommerce\Delivery\Mailer;
 use AnotherEcommerce\Http\CheckoutController;
 use AnotherEcommerce\Http\ReturnController;
 use AnotherEcommerce\Orders\OrderRepository;
+use AnotherEcommerce\Payment\OrderReconciler;
 use AnotherEcommerce\Payment\WebpayGateway;
 use AnotherEcommerce\Products\ProductRepository;
 
@@ -59,11 +60,16 @@ final class Plugin
 
         add_shortcode('aep_comprar', [$this, 'renderShortcode']);
 
-        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products);
+        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products, $this->mailer);
         add_action('admin_post_nopriv_aep_checkout', [$checkout, 'handle']);
         add_action('admin_post_aep_checkout', [$checkout, 'handle']);
 
         add_action('template_redirect', [$this, 'routeFrontActions']);
+
+        // Reconcilia (vía WP-Cron) órdenes cuyo navegador nunca volvió del
+        // retorno de Webpay, para no dejar cobros sin entrega ni registro.
+        $reconciler = new OrderReconciler($this->orders, $this->gateway, $this->mailer);
+        add_action('aep_reconcile_orders', [$reconciler, 'reconcile']);
 
         if (is_admin()) {
             // ProductsPage se registra primero: es dueña del menú de nivel

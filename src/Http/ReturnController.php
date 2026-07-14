@@ -44,6 +44,8 @@ final class ReturnController
             }
 
             $this->redirectFailure($order, 'aborted');
+
+            return;
         }
 
         // Timeout en Webpay: nunca llegó a pagar.
@@ -54,11 +56,15 @@ final class ReturnController
             }
 
             $this->redirectFailure($order, 'timeout');
+
+            return;
         }
 
         $order = $this->orders->findByToken($tokenWs);
         if ($order === null) {
             $this->redirectFailure(null, 'notfound');
+
+            return;
         }
 
         // Idempotencia: si el cliente refresca la página de retorno, la orden
@@ -66,19 +72,41 @@ final class ReturnController
         // ni segundo correo.
         if ($order->status === 'paid') {
             $this->redirectSuccess($order);
+
+            return;
         }
 
         if (in_array($order->status, ['failed', 'aborted'], true)) {
             $this->redirectFailure($order, 'rejected');
+
+            return;
         }
 
-        // Candado atómico contra commits simultáneos (doble clic / refresh).
+        // Candado atómico contra commits simultáneos (doble clic / refresh, o
+        // el cron de reconciliación tomando la orden justo ahora). Si no lo
+        // conseguimos, esa otra ejecución normalmente termina en milisegundos:
+        // esperamos un poco en vez de decirle al cliente "rechazado" cuando en
+        // realidad puede terminar aprobado.
         if (!$this->orders->claimForProcessing($order->id)) {
-            $fresh = $this->orders->findById($order->id);
-            if ($fresh !== null && $fresh->status === 'paid') {
-                $this->redirectSuccess($fresh);
+            $resolved = $this->waitForResolution($order->id) ?? $order;
+
+            if ($resolved->status === 'paid') {
+                $this->redirectSuccess($resolved);
+
+                return;
             }
-            $this->redirectFailure($order, 'rejected');
+
+            if (in_array($resolved->status, ['failed', 'aborted'], true)) {
+                $this->redirectFailure($resolved, 'rejected');
+
+                return;
+            }
+
+            // Sigue 'processing': la otra ejecución no terminó a tiempo. No
+            // sabemos el resultado todavía, así que no decimos "rechazado".
+            $this->redirectFailure($resolved, 'processing');
+
+            return;
         }
 
         try {
@@ -98,19 +126,12 @@ final class ReturnController
                 'payment_type' => $result['payment_type'],
             ]);
             $this->redirectFailure($order, 'rejected');
+
+            return;
         }
 
         $hours = max(1, (int) SettingsPage::get('link_hours'));
-
-        $this->orders->update($order->id, [
-            'status' => 'paid',
-            'authorization_code' => $result['authorization_code'],
-            'payment_type' => $result['payment_type'],
-            'card_last4' => $result['card_last4'],
-            'download_token' => wp_generate_password(48, false),
-            'download_expires_at' => gmdate('Y-m-d H:i:s', time() + $hours * HOUR_IN_SECONDS),
-            'paid_at' => gmdate('Y-m-d H:i:s'),
-        ]);
+        $this->orders->markPaid($order->id, $result, $hours);
 
         $paid = $this->orders->findById($order->id);
 
@@ -131,6 +152,7 @@ final class ReturnController
             'rejected' => 'El pago fue rechazado. No se realizó ningún cargo; puedes intentar con otro medio de pago.',
             'commit_error' => 'No pudimos confirmar el pago con Webpay. Si ves un cargo en tu tarjeta, contáctanos.',
             'notfound' => 'No encontramos la orden asociada a este pago.',
+            'processing' => 'Todavía estamos confirmando tu pago. Espera un momento y vuelve a intentar; si el cargo aparece en tu tarjeta y no recibes el PDF, contáctanos.',
             default => 'El pago no se completó.',
         };
     }
@@ -139,6 +161,26 @@ final class ReturnController
     {
         // Webpay puede volver por GET o por POST según el escenario.
         return isset($_REQUEST[$key]) ? sanitize_text_field(wp_unslash($_REQUEST[$key])) : '';
+    }
+
+    /**
+     * Espera a que otra ejecución que ya tiene el candado 'processing'
+     * (doble clic, refresh, o el cron de reconciliación) termine de resolver
+     * la orden. El commit contra Transbank normalmente tarda menos de un
+     * segundo; 3 intentos de ~0.7s son de sobra para el caso normal sin
+     * bloquear el request más de ~2 segundos en el caso raro de que tarde más.
+     */
+    private function waitForResolution(int $orderId): ?Order
+    {
+        for ($i = 0; $i < 3; $i++) {
+            usleep(700_000);
+            $order = $this->orders->findById($orderId);
+            if ($order === null || $order->status !== 'processing') {
+                return $order;
+            }
+        }
+
+        return $this->orders->findById($orderId);
     }
 
     private function redirectSuccess(Order $order): void

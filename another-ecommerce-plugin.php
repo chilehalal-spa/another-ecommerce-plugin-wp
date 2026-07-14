@@ -45,7 +45,19 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+add_filter('cron_schedules', static function (array $schedules): array {
+    $schedules['aep_fifteen_minutes'] = [
+        'interval' => 15 * MINUTE_IN_SECONDS,
+        'display' => __('Cada 15 minutos (Venta PDF)', 'another-ecommerce-plugin'),
+    ];
+
+    return $schedules;
+});
+
 register_activation_hook(__FILE__, [\AnotherEcommerce\Install\Activator::class, 'activate']);
+register_deactivation_hook(__FILE__, static function (): void {
+    wp_clear_scheduled_hook('aep_reconcile_orders');
+});
 
 add_action('plugins_loaded', static function (): void {
     \AnotherEcommerce\Plugin::boot();

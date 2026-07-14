@@ -100,7 +100,7 @@ final class ProductsPage
                             <?php endif; ?>
                         </td>
                         <td><strong><?php echo esc_html($product->name); ?></strong></td>
-                        <td>$<?php echo esc_html(number_format($product->price, 0, ',', '.')); ?></td>
+                        <td><?php echo $product->price > 0 ? '$' . esc_html(number_format($product->price, 0, ',', '.')) : 'Gratis'; ?></td>
                         <td><code>[aep_comprar id="<?php echo esc_html((string) $product->id); ?>"]</code></td>
                         <td>
                             <?php if (DownloadController::resolveFile($product->pdf_file) !== null) : ?>
@@ -112,14 +112,18 @@ final class ProductsPage
                         <td><?php echo $product->active ? 'Activo' : 'Inactivo'; ?></td>
                         <td>
                             <a class="button button-small" href="<?php echo esc_url(add_query_arg(['page' => self::SLUG, 'action' => 'edit', 'id' => $product->id], admin_url('admin.php'))); ?>">Editar</a>
-                            <a class="button button-small" href="<?php echo esc_url(wp_nonce_url(
-                                admin_url('admin-post.php?action=aep_toggle_product&id=' . $product->id),
-                                'aep_toggle_product_' . $product->id
-                            )); ?>"><?php echo $product->active ? 'Desactivar' : 'Activar'; ?></a>
-                            <a class="button button-small" style="color:#b32d2e;" href="<?php echo esc_url(wp_nonce_url(
-                                admin_url('admin-post.php?action=aep_delete_product&id=' . $product->id),
-                                'aep_delete_product_' . $product->id
-                            )); ?>" onclick="return confirm('¿Eliminar este producto? Las compras ya realizadas seguirán funcionando, pero el producto dejará de venderse.');">Eliminar</a>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                <input type="hidden" name="action" value="aep_toggle_product">
+                                <input type="hidden" name="id" value="<?php echo esc_attr((string) $product->id); ?>">
+                                <?php wp_nonce_field('aep_toggle_product_' . $product->id); ?>
+                                <button type="submit" class="button button-small"><?php echo $product->active ? 'Desactivar' : 'Activar'; ?></button>
+                            </form>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;" onsubmit="return confirm('¿Eliminar este producto? Las compras ya realizadas seguirán funcionando, pero el producto dejará de venderse.');">
+                                <input type="hidden" name="action" value="aep_delete_product">
+                                <input type="hidden" name="id" value="<?php echo esc_attr((string) $product->id); ?>">
+                                <?php wp_nonce_field('aep_delete_product_' . $product->id); ?>
+                                <button type="submit" class="button button-small" style="color:#b32d2e;">Eliminar</button>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -138,7 +142,7 @@ final class ProductsPage
 
         $error = isset($_GET['aep_error']) ? sanitize_key(wp_unslash($_GET['aep_error'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $errorMessage = match ($error) {
-            'invalid' => 'Ingresa un nombre y un precio mayor a 0.',
+            'invalid' => 'Ingresa un nombre para el producto.',
             'pdf' => 'No se pudo subir el PDF. Verifica que sea un archivo .pdf válido.',
             'nopdf' => 'Debes subir un PDF para este producto.',
             'image' => 'No se pudo subir la imagen. Verifica que sea un JPG, PNG o WebP válido.',
@@ -170,8 +174,8 @@ final class ProductsPage
                     <tr>
                         <th scope="row"><label for="aep-price">Precio (CLP)</label></th>
                         <td>
-                            <input type="number" id="aep-price" min="1" step="1" name="aep_price" required value="<?php echo esc_attr((string) ($product->price ?? '')); ?>">
-                            <p class="description">Pesos chilenos, sin decimales ni puntos.</p>
+                            <input type="number" id="aep-price" min="0" step="1" name="aep_price" required value="<?php echo esc_attr((string) ($product->price ?? '')); ?>">
+                            <p class="description">Pesos chilenos, sin decimales ni puntos. Usa 0 para ofrecer el PDF gratis (sin pasar por Webpay).</p>
                         </td>
                     </tr>
                     <tr>
@@ -230,7 +234,7 @@ final class ProductsPage
             admin_url('admin.php')
         );
 
-        if ($name === '' || $price <= 0) {
+        if ($name === '') {
             wp_safe_redirect(add_query_arg('aep_error', 'invalid', $formUrl));
             exit;
         }
@@ -332,7 +336,7 @@ final class ProductsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
         check_admin_referer('aep_toggle_product_' . $id);
 
         $product = $this->products->findById($id);
@@ -350,7 +354,7 @@ final class ProductsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
         check_admin_referer('aep_delete_product_' . $id);
 
         $this->products->delete($id);

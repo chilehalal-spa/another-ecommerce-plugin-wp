@@ -91,6 +91,20 @@ final class DownloadController
         $downloadName = sanitize_file_name($order->product_name);
         $downloadName = ($downloadName !== '' ? $downloadName : 'documento') . '.pdf';
 
+        // Un buffer de salida activo (plugins de caché/minificación que
+        // envuelven la página con ob_start) haría que este streaming se
+        // acumule entero en ese buffer en vez de enviarse en trozos al
+        // navegador, y podría desajustar el Content-Length declarado abajo.
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        // Un archivo grande en una conexión lenta puede superar el límite
+        // por defecto de max_execution_time; la descarga en sí no debe cortarse.
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
         nocache_headers();
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $downloadName . '"');

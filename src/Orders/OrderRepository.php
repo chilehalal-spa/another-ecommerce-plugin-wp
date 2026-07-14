@@ -88,6 +88,26 @@ final class OrderRepository
     }
 
     /**
+     * Transición a 'paid' compartida por el retorno normal (ReturnController)
+     * y por la reconciliación en segundo plano (OrderReconciler): genera el
+     * token de descarga y fija su vencimiento.
+     *
+     * @param array{authorization_code: string, payment_type: string, card_last4: string} $webpayResult
+     */
+    public function markPaid(int $id, array $webpayResult, int $linkHours): void
+    {
+        $this->update($id, [
+            'status' => 'paid',
+            'authorization_code' => $webpayResult['authorization_code'],
+            'payment_type' => $webpayResult['payment_type'],
+            'card_last4' => $webpayResult['card_last4'],
+            'download_token' => wp_generate_password(48, false),
+            'download_expires_at' => gmdate('Y-m-d H:i:s', time() + $linkHours * HOUR_IN_SECONDS),
+            'paid_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
      * Candado anti doble procesamiento: pasa la orden de pending a processing
      * de forma atómica. Si otro request (un refresh del retorno) llegó antes,
      * el UPDATE afecta 0 filas y devolvemos false.
@@ -102,6 +122,47 @@ final class OrderRepository
         ));
 
         return $updated === 1;
+    }
+
+    /**
+     * Suelta el candado de 'processing' cuando la reconciliación no pudo
+     * determinar qué pasó con la transacción (p. ej. Webpay no respondió),
+     * para reintentarla en la siguiente pasada del cron.
+     */
+    public function release(int $id): void
+    {
+        global $wpdb;
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$this->table} SET status = 'pending' WHERE id = %d AND status = 'processing'",
+            $id
+        ));
+    }
+
+    /**
+     * Órdenes 'pending'/'processing' con una transacción Webpay creada
+     * (token_ws) que llevan más de $minutesOld sin resolverse: el navegador
+     * del cliente probablemente nunca volvió del retorno. Candidatas para
+     * que OrderReconciler consulte su estado real en Transbank.
+     *
+     * @return Order[]
+     */
+    public function staleUnresolved(int $minutesOld, int $limit): array
+    {
+        global $wpdb;
+
+        $threshold = gmdate('Y-m-d H:i:s', time() - $minutesOld * MINUTE_IN_SECONDS);
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE status IN ('pending', 'processing') AND token_ws != '' AND created_at <= %s
+             ORDER BY id ASC
+             LIMIT %d",
+            $threshold,
+            $limit
+        ));
+
+        return array_map([Order::class, 'fromRow'], $rows ?: []);
     }
 
     public function incrementDownloads(int $id): void

@@ -8,6 +8,8 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
+wp_clear_scheduled_hook('aep_reconcile_orders');
+
 delete_option('aep_settings');
 delete_option('aep_db_version');
 
