@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+$aep_free = $product->price === 0;
 $aep_price = number_format($product->price, 0, ',', '.');
 // Sufijo único por producto: una misma página puede tener varios botones
 // "Comprar ahora", uno por producto, y los ids de los campos no pueden repetirse.
@@ -24,7 +25,13 @@ $aep_open = $error_message !== '';
     <summary class="aep-summary">
         <span class="aep-header">
             <span class="aep-title"><?php echo esc_html($product->name); ?></span>
-            <span class="aep-price">$<?php echo esc_html($aep_price); ?> <small>CLP</small></span>
+            <span class="aep-price">
+                <?php if ($aep_free) : ?>
+                    Gratis
+                <?php else : ?>
+                    $<?php echo esc_html($aep_price); ?> <small>CLP</small>
+                <?php endif; ?>
+            </span>
         </span>
         <?php if ($product->image_url !== '') : ?>
             <span class="aep-cover">
@@ -32,7 +39,7 @@ $aep_open = $error_message !== '';
             </span>
         <?php endif; ?>
         <span class="aep-cta">
-            Comprar ahora
+            <?php echo $aep_free ? 'Descargar gratis' : 'Comprar ahora'; ?>
             <svg class="aep-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -40,7 +47,11 @@ $aep_open = $error_message !== '';
     </summary>
 
     <div class="aep-body">
-        <p class="aep-delivery">Recibirás el PDF por correo inmediatamente después del pago.</p>
+        <p class="aep-delivery">
+            <?php echo $aep_free
+                ? 'Recibirás el PDF por correo inmediatamente después de completar el formulario.'
+                : 'Recibirás el PDF por correo inmediatamente después del pago.'; ?>
+        </p>
 
         <?php if ($error_message !== '') : ?>
             <p class="aep-error"><?php echo esc_html($error_message); ?></p>
@@ -80,7 +91,7 @@ $aep_open = $error_message !== '';
                 </label>
             </p>
 
-            <button type="submit" class="aep-button">Pagar con Webpay</button>
+            <button type="submit" class="aep-button"><?php echo $aep_free ? 'Obtener gratis' : 'Pagar con Webpay'; ?></button>
         </form>
     </div>
 </details>

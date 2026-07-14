@@ -533,7 +533,7 @@ final class SettingsPage
                         <td><?php echo esc_html($order->product_name); ?></td>
                         <td><?php echo esc_html($order->customer_name); ?></td>
                         <td><?php echo esc_html($order->customer_email); ?></td>
-                        <td>$<?php echo esc_html(number_format($order->amount, 0, ',', '.')); ?></td>
+                        <td><?php echo $order->amount > 0 ? '$' . esc_html(number_format($order->amount, 0, ',', '.')) : 'Gratis'; ?></td>
                         <td><?php echo esc_html($statusLabels[$order->status] ?? $order->status); ?></td>
                         <td>
                             <?php echo esc_html($order->authorization_code); ?>

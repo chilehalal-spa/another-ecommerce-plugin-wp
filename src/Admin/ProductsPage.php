@@ -100,7 +100,7 @@ final class ProductsPage
                             <?php endif; ?>
                         </td>
                         <td><strong><?php echo esc_html($product->name); ?></strong></td>
-                        <td>$<?php echo esc_html(number_format($product->price, 0, ',', '.')); ?></td>
+                        <td><?php echo $product->price > 0 ? '$' . esc_html(number_format($product->price, 0, ',', '.')) : 'Gratis'; ?></td>
                         <td><code>[aep_comprar id="<?php echo esc_html((string) $product->id); ?>"]</code></td>
                         <td>
                             <?php if (DownloadController::resolveFile($product->pdf_file) !== null) : ?>
@@ -138,7 +138,7 @@ final class ProductsPage
 
         $error = isset($_GET['aep_error']) ? sanitize_key(wp_unslash($_GET['aep_error'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $errorMessage = match ($error) {
-            'invalid' => 'Ingresa un nombre y un precio mayor a 0.',
+            'invalid' => 'Ingresa un nombre para el producto.',
             'pdf' => 'No se pudo subir el PDF. Verifica que sea un archivo .pdf válido.',
             'nopdf' => 'Debes subir un PDF para este producto.',
             'image' => 'No se pudo subir la imagen. Verifica que sea un JPG, PNG o WebP válido.',
@@ -170,8 +170,8 @@ final class ProductsPage
                     <tr>
                         <th scope="row"><label for="aep-price">Precio (CLP)</label></th>
                         <td>
-                            <input type="number" id="aep-price" min="1" step="1" name="aep_price" required value="<?php echo esc_attr((string) ($product->price ?? '')); ?>">
-                            <p class="description">Pesos chilenos, sin decimales ni puntos.</p>
+                            <input type="number" id="aep-price" min="0" step="1" name="aep_price" required value="<?php echo esc_attr((string) ($product->price ?? '')); ?>">
+                            <p class="description">Pesos chilenos, sin decimales ni puntos. Usa 0 para ofrecer el PDF gratis (sin pasar por Webpay).</p>
                         </td>
                     </tr>
                     <tr>
@@ -230,7 +230,7 @@ final class ProductsPage
             admin_url('admin.php')
         );
 
-        if ($name === '' || $price <= 0) {
+        if ($name === '') {
             wp_safe_redirect(add_query_arg('aep_error', 'invalid', $formUrl));
             exit;
         }

@@ -60,7 +60,7 @@ final class Plugin
 
         add_shortcode('aep_comprar', [$this, 'renderShortcode']);
 
-        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products);
+        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products, $this->mailer);
         add_action('admin_post_nopriv_aep_checkout', [$checkout, 'handle']);
         add_action('admin_post_aep_checkout', [$checkout, 'handle']);
 
