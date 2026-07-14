@@ -18,8 +18,22 @@ final class Activator
         self::createProtectedDir();
         self::seedDefaultSettings();
         self::migrateLegacySingleProduct();
+        self::scheduleReconciliation();
 
         update_option('aep_db_version', AEP_VERSION);
+    }
+
+    /**
+     * Cron que reconcilia órdenes 'pending'/'processing' cuyo navegador nunca
+     * volvió del retorno de Webpay (ver OrderReconciler). Se registra aquí
+     * (no solo en la activación) porque maybeUpgrade() vuelve a llamar a
+     * activate() en sitios ya desplegados que actualizan el plugin.
+     */
+    private static function scheduleReconciliation(): void
+    {
+        if (!wp_next_scheduled('aep_reconcile_orders')) {
+            wp_schedule_event(time(), 'aep_fifteen_minutes', 'aep_reconcile_orders');
+        }
     }
 
     private static function createOrdersTable(): void

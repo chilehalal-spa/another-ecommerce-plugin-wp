@@ -58,8 +58,43 @@ final class WebpayGateway
      */
     public function commitTransaction(string $tokenWs): array
     {
-        $response = $this->transaction()->commit($tokenWs);
+        return $this->normalizeResult($this->transaction()->commit($tokenWs));
+    }
 
+    /**
+     * Consulta el estado de la transacción en Webpay sin confirmarla. Sirve
+     * para reconciliar órdenes cuyo commit nunca llegó a hacerse (el
+     * navegador del cliente no volvió del retorno). Si el estado es
+     * "INITIALIZED", Webpay todavía no fue confirmada por nadie.
+     *
+     * @return array{
+     *     approved: bool,
+     *     status: string,
+     *     response_code: int,
+     *     authorization_code: string,
+     *     payment_type: string,
+     *     card_last4: string,
+     *     amount: int
+     * }
+     */
+    public function statusTransaction(string $tokenWs): array
+    {
+        return $this->normalizeResult($this->transaction()->status($tokenWs));
+    }
+
+    /**
+     * @return array{
+     *     approved: bool,
+     *     status: string,
+     *     response_code: int,
+     *     authorization_code: string,
+     *     payment_type: string,
+     *     card_last4: string,
+     *     amount: int
+     * }
+     */
+    private function normalizeResult(object $response): array
+    {
         return [
             'approved' => $response->isApproved(),
             'status' => (string) $response->getStatus(),

@@ -101,16 +101,7 @@ final class ReturnController
         }
 
         $hours = max(1, (int) SettingsPage::get('link_hours'));
-
-        $this->orders->update($order->id, [
-            'status' => 'paid',
-            'authorization_code' => $result['authorization_code'],
-            'payment_type' => $result['payment_type'],
-            'card_last4' => $result['card_last4'],
-            'download_token' => wp_generate_password(48, false),
-            'download_expires_at' => gmdate('Y-m-d H:i:s', time() + $hours * HOUR_IN_SECONDS),
-            'paid_at' => gmdate('Y-m-d H:i:s'),
-        ]);
+        $this->orders->markPaid($order->id, $result, $hours);
 
         $paid = $this->orders->findById($order->id);
 
