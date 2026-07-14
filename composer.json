@@ -1,5 +1,7 @@
 {
-  "name": "tuusuario/another-ecommerce-plugin",
+  "name": "chomusuke-png/another-ecommerce-plugin",
+  "description": "Venta de un único PDF con Webpay Plus: comprar ahora sin carrito ni registro, entrega por correo.",
+  "license": "GPL-2.0-or-later",
   "require": {
     "php": ">=8.0",
     "transbank/transbank-sdk": "^5.0"
