@@ -544,10 +544,12 @@ final class SettingsPage
                         <td><?php echo esc_html((string) $order->downloads); ?></td>
                         <td>
                             <?php if ($order->status === 'paid') : ?>
-                                <a class="button button-small" href="<?php echo esc_url(wp_nonce_url(
-                                    admin_url('admin-post.php?action=aep_resend_email&order=' . $order->id),
-                                    'aep_resend_' . $order->id
-                                )); ?>">Reenviar correo</a>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <input type="hidden" name="action" value="aep_resend_email">
+                                    <input type="hidden" name="order" value="<?php echo esc_attr((string) $order->id); ?>">
+                                    <?php wp_nonce_field('aep_resend_' . $order->id); ?>
+                                    <button type="submit" class="button button-small">Reenviar correo</button>
+                                </form>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -580,7 +582,7 @@ final class SettingsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $orderId = isset($_GET['order']) ? absint($_GET['order']) : 0;
+        $orderId = isset($_POST['order']) ? absint($_POST['order']) : 0;
         check_admin_referer('aep_resend_' . $orderId);
 
         $redirect = admin_url('admin.php?page=' . self::ORDERS_SLUG);

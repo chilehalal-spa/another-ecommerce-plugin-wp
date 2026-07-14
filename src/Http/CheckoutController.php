@@ -35,11 +35,15 @@ final class CheckoutController
 
         if (!isset($_POST['aep_nonce']) || !wp_verify_nonce(sanitize_key(wp_unslash($_POST['aep_nonce'])), 'aep_checkout')) {
             $this->backToForm($pageUrl, $productId, 'nonce');
+
+            return;
         }
 
         // Honeypot: un humano nunca llena este campo oculto.
         if (!empty($_POST['aep_website'])) {
             $this->backToForm($pageUrl, $productId, 'bot');
+
+            return;
         }
 
         $name = isset($_POST['aep_name']) ? sanitize_text_field(wp_unslash($_POST['aep_name'])) : '';
@@ -48,28 +52,40 @@ final class CheckoutController
 
         if ($name === '' || mb_strlen($name) > 190) {
             $this->backToForm($pageUrl, $productId, 'name');
+
+            return;
         }
 
         if ($email === '' || !is_email($email)) {
             $this->backToForm($pageUrl, $productId, 'email');
+
+            return;
         }
 
         if (strcasecmp($email, $emailConfirm) !== 0) {
             $this->backToForm($pageUrl, $productId, 'email_mismatch');
+
+            return;
         }
 
         if (empty($_POST['aep_terms'])) {
             $this->backToForm($pageUrl, $productId, 'terms');
+
+            return;
         }
 
         $product = $productId > 0 ? $this->products->findById($productId) : null;
         if ($product === null || !$product->active || $product->pdf_file === '') {
             $this->backToForm($pageUrl, $productId, 'unconfigured');
+
+            return;
         }
 
         $order = $this->orders->create($name, $email, $product, $pageUrl);
         if ($order === null) {
             $this->backToForm($pageUrl, $productId, 'internal');
+
+            return;
         }
 
         if ($product->price === 0) {

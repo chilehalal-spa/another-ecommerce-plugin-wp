@@ -112,14 +112,18 @@ final class ProductsPage
                         <td><?php echo $product->active ? 'Activo' : 'Inactivo'; ?></td>
                         <td>
                             <a class="button button-small" href="<?php echo esc_url(add_query_arg(['page' => self::SLUG, 'action' => 'edit', 'id' => $product->id], admin_url('admin.php'))); ?>">Editar</a>
-                            <a class="button button-small" href="<?php echo esc_url(wp_nonce_url(
-                                admin_url('admin-post.php?action=aep_toggle_product&id=' . $product->id),
-                                'aep_toggle_product_' . $product->id
-                            )); ?>"><?php echo $product->active ? 'Desactivar' : 'Activar'; ?></a>
-                            <a class="button button-small" style="color:#b32d2e;" href="<?php echo esc_url(wp_nonce_url(
-                                admin_url('admin-post.php?action=aep_delete_product&id=' . $product->id),
-                                'aep_delete_product_' . $product->id
-                            )); ?>" onclick="return confirm('¿Eliminar este producto? Las compras ya realizadas seguirán funcionando, pero el producto dejará de venderse.');">Eliminar</a>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                <input type="hidden" name="action" value="aep_toggle_product">
+                                <input type="hidden" name="id" value="<?php echo esc_attr((string) $product->id); ?>">
+                                <?php wp_nonce_field('aep_toggle_product_' . $product->id); ?>
+                                <button type="submit" class="button button-small"><?php echo $product->active ? 'Desactivar' : 'Activar'; ?></button>
+                            </form>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;" onsubmit="return confirm('¿Eliminar este producto? Las compras ya realizadas seguirán funcionando, pero el producto dejará de venderse.');">
+                                <input type="hidden" name="action" value="aep_delete_product">
+                                <input type="hidden" name="id" value="<?php echo esc_attr((string) $product->id); ?>">
+                                <?php wp_nonce_field('aep_delete_product_' . $product->id); ?>
+                                <button type="submit" class="button button-small" style="color:#b32d2e;">Eliminar</button>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -332,7 +336,7 @@ final class ProductsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
         check_admin_referer('aep_toggle_product_' . $id);
 
         $product = $this->products->findById($id);
@@ -350,7 +354,7 @@ final class ProductsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
         check_admin_referer('aep_delete_product_' . $id);
 
         $this->products->delete($id);

@@ -44,6 +44,8 @@ final class ReturnController
             }
 
             $this->redirectFailure($order, 'aborted');
+
+            return;
         }
 
         // Timeout en Webpay: nunca llegó a pagar.
@@ -54,11 +56,15 @@ final class ReturnController
             }
 
             $this->redirectFailure($order, 'timeout');
+
+            return;
         }
 
         $order = $this->orders->findByToken($tokenWs);
         if ($order === null) {
             $this->redirectFailure(null, 'notfound');
+
+            return;
         }
 
         // Idempotencia: si el cliente refresca la página de retorno, la orden
@@ -66,10 +72,14 @@ final class ReturnController
         // ni segundo correo.
         if ($order->status === 'paid') {
             $this->redirectSuccess($order);
+
+            return;
         }
 
         if (in_array($order->status, ['failed', 'aborted'], true)) {
             $this->redirectFailure($order, 'rejected');
+
+            return;
         }
 
         // Candado atómico contra commits simultáneos (doble clic / refresh, o
@@ -82,15 +92,21 @@ final class ReturnController
 
             if ($resolved->status === 'paid') {
                 $this->redirectSuccess($resolved);
+
+                return;
             }
 
             if (in_array($resolved->status, ['failed', 'aborted'], true)) {
                 $this->redirectFailure($resolved, 'rejected');
+
+                return;
             }
 
             // Sigue 'processing': la otra ejecución no terminó a tiempo. No
             // sabemos el resultado todavía, así que no decimos "rechazado".
             $this->redirectFailure($resolved, 'processing');
+
+            return;
         }
 
         try {
@@ -110,6 +126,8 @@ final class ReturnController
                 'payment_type' => $result['payment_type'],
             ]);
             $this->redirectFailure($order, 'rejected');
+
+            return;
         }
 
         $hours = max(1, (int) SettingsPage::get('link_hours'));
