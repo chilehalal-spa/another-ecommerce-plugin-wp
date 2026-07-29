@@ -518,13 +518,14 @@ final class SettingsPage
                         <th>Monto</th>
                         <th>Estado</th>
                         <th>Autorización</th>
+                        <th>Token Webpay</th>
                         <th>Descargas</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ($orders === []) : ?>
-                    <tr><td colspan="10">Sin ventas todavía.</td></tr>
+                    <tr><td colspan="11">Sin ventas todavía.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($orders as $order) : ?>
                     <tr>
@@ -541,6 +542,7 @@ final class SettingsPage
                                 <span class="description">(···<?php echo esc_html($order->card_last4); ?>)</span>
                             <?php endif; ?>
                         </td>
+                        <td><code><?php echo esc_html($order->token_ws); ?></code></td>
                         <td><?php echo esc_html((string) $order->downloads); ?></td>
                         <td>
                             <?php if ($order->status === 'paid') : ?>
