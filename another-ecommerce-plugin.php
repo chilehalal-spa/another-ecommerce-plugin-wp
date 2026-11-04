@@ -2,19 +2,24 @@
 /**
  * Plugin Name:       Another Ecommerce Plugin
  * Description:       Venta de PDFs con botón "Comprar ahora" súper simplificado: pago con Webpay Plus (Transbank), sin carrito ni registro, entrega por correo con enlace de descarga temporal.
- * Version:           1.1.1
+ * Version:           1.2.0
  * Requires at least: 6.0
- * Requires PHP:      8.0
+ * Requires PHP:      8.2
  * Author:            Zumito
  * License:           GPL-2.0-or-later
  * Text Domain:       another-ecommerce-plugin
+ * Update URI:        https://github.com/chilehalal-spa/another-ecommerce-plugin-wp
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AEP_VERSION', '1.1.1');
+// Actualizaciones desde las releases de GitHub
+require_once __DIR__ . '/includes/class-chilehalal-github-updater.php';
+Chilehalal_GitHub_Updater_V1::register( __FILE__, 'chilehalal-spa/another-ecommerce-plugin-wp' );
+
+define('AEP_VERSION', '1.2.0');
 define('AEP_FILE', __FILE__);
 define('AEP_DIR', plugin_dir_path(__FILE__));
 define('AEP_URL', plugin_dir_url(__FILE__));

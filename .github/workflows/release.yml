@@ -1,0 +1,48 @@
+# Al subir un tag vX.Y.Z publica una release con el zip que instala WordPress.
+# El zip lleva la carpeta con el nombre del plugin; el zip de codigo fuente que
+# genera GitHub cambia ese nombre y WordPress desactivaria el plugin.
+#
+# Corre en los runners de GitHub (gratis en repos publicos). No usar runners
+# propios en repos publicos: un pull request de un fork podria ejecutar codigo
+# en ese PC.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN_SLUG: another-ecommerce-plugin
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar que el tag coincide con la version del plugin
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(grep -m1 -oP '^\s*\*?\s*Version:\s*\K\S+' "$PLUGIN_SLUG.php")
+          if [ "$tag" != "$version" ]; then
+            echo "::error::El tag ($tag) no coincide con 'Version:' en $PLUGIN_SLUG.php ($version)"
+            exit 1
+          fi
+
+      - name: Armar zip
+        run: |
+          mkdir build
+          git archive --prefix="$PLUGIN_SLUG/" HEAD | tar -x -C build
+          # Las dependencias de Composer no estan en git: se instalan en el zip.
+          if [ -f "build/$PLUGIN_SLUG/composer.json" ]; then
+            composer install --working-dir="build/$PLUGIN_SLUG" --no-dev --optimize-autoloader --no-interaction --no-progress
+          fi
+          (cd build && zip -qr "../$PLUGIN_SLUG.zip" "$PLUGIN_SLUG")
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$PLUGIN_SLUG.zip" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

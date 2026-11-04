@@ -120,3 +120,31 @@ producto al momento de la compra. Por eso:
   detecta en la siguiente visita si la versión instalada cambió y aplica
   los ajustes de base de datos que falten (columnas o tablas nuevas) sin
   necesitar desactivar/reactivar.
+
+## Actualizaciones
+
+El plugin se actualiza desde las releases de este repositorio, como cualquier
+plugin de wordpress.org: aparecen en *Escritorio → Actualizaciones* y se pueden
+dejar automáticas en *Plugins → Activar actualizaciones automáticas*.
+
+WordPress revisa cada 12 horas; la respuesta de GitHub se guarda 6 horas.
+
+## Publicar una versión nueva
+
+1. Sube `Version:` en `another-ecommerce-plugin.php` (por ejemplo `1.3.0`).
+   Actualiza también la constante `AEP_VERSION`.
+2. Haz commit y push.
+3. Crea y sube el tag con el mismo número:
+
+   ```bash
+   git tag v1.3.0
+   git push origin v1.3.0
+   ```
+
+La Action [Release](.github/workflows/release.yml) verifica que el tag coincida
+con la versión, arma `another-ecommerce-plugin.zip` (con las dependencias de Composer) y publica la release. Desde ese
+momento los sitios ven la actualización.
+
+## Licencia
+
+GPL-2.0-or-later. Ver [LICENSE](LICENSE).
