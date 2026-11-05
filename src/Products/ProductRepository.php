@@ -15,13 +15,14 @@ final class ProductRepository
         $this->table = $wpdb->prefix . 'aep_products';
     }
 
-    public function create(string $name, int $price, string $pdfFile, bool $active, string $imageUrl = ''): int
+    public function create(string $name, int $price, string $pdfFile, bool $active, string $imageUrl = '', int $priceUsd = 0): int
     {
         global $wpdb;
 
         $wpdb->insert($this->table, [
             'name' => $name,
             'price' => $price,
+            'price_usd' => $priceUsd,
             'pdf_file' => $pdfFile,
             'image_url' => $imageUrl,
             'active' => $active ? 1 : 0,

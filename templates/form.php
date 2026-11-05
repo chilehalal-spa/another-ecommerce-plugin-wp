@@ -5,7 +5,8 @@
  * que el navegador expande al hacer clic (sin JavaScript).
  *
  * Variables: \AnotherEcommerce\Products\Product $product, array $settings,
- * string $error_message, string $page_url
+ * string $error_message, string $page_url,
+ * \AnotherEcommerce\Payment\PaymentGatewayInterface[] $gateways
  */
 
 if (!defined('ABSPATH')) {
@@ -14,6 +15,12 @@ if (!defined('ABSPATH')) {
 
 $aep_free = $product->price === 0;
 $aep_price = number_format($product->price, 0, ',', '.');
+$aep_price_usd = number_format($product->price_usd / 100, 2, '.', ',');
+$aep_gateway_labels = [
+    'webpay' => 'Webpay',
+    'stripe' => 'Tarjeta internacional (Stripe)',
+    'lemonsqueezy' => 'Lemon Squeezy',
+];
 // Sufijo único por producto: una misma página puede tener varios botones
 // "Comprar ahora", uno por producto, y los ids de los campos no pueden repetirse.
 $aep_uid = (string) $product->id;
@@ -84,6 +91,23 @@ $aep_open = $error_message !== '';
                 <input type="text" id="aep-website-<?php echo esc_attr($aep_uid); ?>" name="aep_website" tabindex="-1" autocomplete="off">
             </p>
 
+            <?php if (!$aep_free && count($gateways) > 1) : ?>
+                <fieldset class="aep-gateways">
+                    <legend>Medio de pago</legend>
+                    <?php foreach ($gateways as $aep_index => $aep_gateway) : ?>
+                        <label class="aep-gateway-option">
+                            <input type="radio" name="aep_gateway" value="<?php echo esc_attr($aep_gateway->id()); ?>" <?php checked($aep_index === 0); ?> required>
+                            <span>
+                                <?php echo esc_html($aep_gateway_labels[$aep_gateway->id()] ?? $aep_gateway->id()); ?> —
+                                <?php echo $aep_gateway->id() === 'webpay' ? '$' . esc_html($aep_price) . ' CLP' : 'US$' . esc_html($aep_price_usd); ?>
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </fieldset>
+            <?php else : ?>
+                <input type="hidden" name="aep_gateway" value="<?php echo esc_attr($gateways[0]->id() ?? 'webpay'); ?>">
+            <?php endif; ?>
+
             <p class="aep-terms">
                 <label>
                     <input type="checkbox" name="aep_terms" value="1" required>
@@ -91,7 +115,15 @@ $aep_open = $error_message !== '';
                 </label>
             </p>
 
-            <button type="submit" class="aep-button"><?php echo $aep_free ? 'Obtener gratis' : 'Pagar con Webpay'; ?></button>
+            <button type="submit" class="aep-button">
+                <?php
+                echo match (true) {
+                    $aep_free => 'Obtener gratis',
+                    count($gateways) > 1 => 'Continuar al pago',
+                    default => 'Pagar con Webpay',
+                };
+                ?>
+            </button>
         </form>
     </div>
 </details>
@@ -124,6 +156,10 @@ $aep_open = $error_message !== '';
     .aep-box .aep-field input { width: 100%; padding: 8px 10px; border: 1px solid #bbb; border-radius: 6px; box-sizing: border-box; }
     .aep-box .aep-field small { color: #666; }
     .aep-box .aep-hp { position: absolute; left: -9999px; }
+    .aep-box .aep-gateways { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; }
+    .aep-box .aep-gateways legend { font-weight: 600; padding: 0 4px; font-size: 0.85em; }
+    .aep-box .aep-gateway-option { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-weight: 400; cursor: pointer; }
+    .aep-box .aep-gateway-option input { width: auto; }
     .aep-box .aep-terms { font-size: 0.72em; line-height: 1.4; color: #777; }
     .aep-box .aep-terms-text p { display: inline; margin: 0; }
     .aep-box .aep-button { width: 100%; padding: 14px; font-size: 1.05em; font-weight: 700; color: #fff; background: #1a7f37; border: 0; border-radius: 8px; cursor: pointer; }

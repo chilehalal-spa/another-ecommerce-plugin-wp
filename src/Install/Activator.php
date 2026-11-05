@@ -54,6 +54,9 @@ final class Activator
             product_name VARCHAR(190) NOT NULL DEFAULT '',
             pdf_file VARCHAR(255) NOT NULL DEFAULT '',
             amount INT UNSIGNED NOT NULL DEFAULT 0,
+            gateway VARCHAR(20) NOT NULL DEFAULT 'webpay',
+            currency VARCHAR(3) NOT NULL DEFAULT 'CLP',
+            gateway_reference VARCHAR(191) NOT NULL DEFAULT '',
             authorization_code VARCHAR(20) NOT NULL DEFAULT '',
             payment_type VARCHAR(10) NOT NULL DEFAULT '',
             card_last4 VARCHAR(4) NOT NULL DEFAULT '',
@@ -66,6 +69,7 @@ final class Activator
             PRIMARY KEY  (id),
             UNIQUE KEY buy_order (buy_order),
             KEY token_ws (token_ws(64)),
+            KEY gateway_reference (gateway_reference(64)),
             KEY status (status),
             KEY product_id (product_id)
         ) {$charset};";
@@ -85,6 +89,7 @@ final class Activator
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(190) NOT NULL DEFAULT '',
             price INT UNSIGNED NOT NULL DEFAULT 0,
+            price_usd INT UNSIGNED NOT NULL DEFAULT 0,
             pdf_file VARCHAR(255) NOT NULL DEFAULT '',
             image_url VARCHAR(255) NOT NULL DEFAULT '',
             active TINYINT(1) NOT NULL DEFAULT 1,

@@ -80,6 +80,7 @@ final class ProductsPage
                         <th>Portada</th>
                         <th>Nombre</th>
                         <th>Precio</th>
+                        <th>Precio USD</th>
                         <th>Shortcode</th>
                         <th>PDF</th>
                         <th>Estado</th>
@@ -88,7 +89,7 @@ final class ProductsPage
                 </thead>
                 <tbody>
                 <?php if ($products === []) : ?>
-                    <tr><td colspan="7">Todavía no has creado ningún producto. Usa «Añadir nuevo» para subir tu primer PDF.</td></tr>
+                    <tr><td colspan="8">Todavía no has creado ningún producto. Usa «Añadir nuevo» para subir tu primer PDF.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($products as $product) : ?>
                     <tr>
@@ -101,6 +102,7 @@ final class ProductsPage
                         </td>
                         <td><strong><?php echo esc_html($product->name); ?></strong></td>
                         <td><?php echo $product->price > 0 ? '$' . esc_html(number_format($product->price, 0, ',', '.')) : 'Gratis'; ?></td>
+                        <td><?php echo $product->price_usd > 0 ? 'US$' . esc_html(number_format($product->price_usd / 100, 2, '.', ',')) : '—'; ?></td>
                         <td><code>[aep_comprar id="<?php echo esc_html((string) $product->id); ?>"]</code></td>
                         <td>
                             <?php if (DownloadController::resolveFile($product->pdf_file) !== null) : ?>
@@ -179,6 +181,13 @@ final class ProductsPage
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="aep-price-usd">Precio USD (venta internacional)</label></th>
+                        <td>
+                            <input type="number" id="aep-price-usd" min="0" step="0.01" name="aep_price_usd" value="<?php echo esc_attr($product !== null && $product->price_usd > 0 ? number_format($product->price_usd / 100, 2, '.', '') : ''); ?>">
+                            <p class="description">Dólares (ej. 9.99). Déjalo vacío o en 0 para no ofrecer este producto en Stripe/Lemon Squeezy — solo se vende en CLP vía Webpay. Configura las credenciales en <a href="<?php echo esc_url(admin_url('admin.php?page=' . SettingsPage::MENU_SLUG . '&tab=payments')); ?>">Ajustes → Medios de pago</a>.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="aep-active">Estado</label></th>
                         <td><label><input type="checkbox" id="aep-active" name="aep_active" value="1" <?php checked($product === null || $product->active); ?>> Activo (visible y comprable)</label></td>
                     </tr>
@@ -227,6 +236,10 @@ final class ProductsPage
         $id = isset($_POST['aep_id']) ? absint($_POST['aep_id']) : 0;
         $name = isset($_POST['aep_name']) ? sanitize_text_field(wp_unslash($_POST['aep_name'])) : '';
         $price = isset($_POST['aep_price']) ? max(0, absint($_POST['aep_price'])) : 0;
+        // Se ingresa en dólares (ej. "9.99") y se guarda en centavos, como Stripe/Lemon Squeezy.
+        $priceUsd = isset($_POST['aep_price_usd']) && $_POST['aep_price_usd'] !== ''
+            ? max(0, (int) round(((float) wp_unslash($_POST['aep_price_usd'])) * 100))
+            : 0;
         $active = !empty($_POST['aep_active']);
 
         $formUrl = add_query_arg(
@@ -318,12 +331,13 @@ final class ProductsPage
             $this->products->update($id, [
                 'name' => $name,
                 'price' => $price,
+                'price_usd' => $priceUsd,
                 'pdf_file' => $pdfFile,
                 'image_url' => $imageUrl,
                 'active' => $active ? 1 : 0,
             ]);
         } else {
-            $id = $this->products->create($name, $price, $pdfFile, $active, $imageUrl);
+            $id = $this->products->create($name, $price, $pdfFile, $active, $imageUrl, $priceUsd);
         }
 
         wp_safe_redirect(add_query_arg(['page' => self::SLUG, 'aep_saved' => '1'], admin_url('admin.php')));

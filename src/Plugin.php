@@ -7,9 +7,14 @@ use AnotherEcommerce\Admin\SettingsPage;
 use AnotherEcommerce\Delivery\DownloadController;
 use AnotherEcommerce\Delivery\Mailer;
 use AnotherEcommerce\Http\CheckoutController;
+use AnotherEcommerce\Http\InternationalReturnController;
+use AnotherEcommerce\Http\PaymentWebhookController;
 use AnotherEcommerce\Http\ReturnController;
 use AnotherEcommerce\Orders\OrderRepository;
+use AnotherEcommerce\Payment\GatewayRegistry;
+use AnotherEcommerce\Payment\LemonSqueezyGateway;
 use AnotherEcommerce\Payment\OrderReconciler;
+use AnotherEcommerce\Payment\StripeGateway;
 use AnotherEcommerce\Payment\WebpayGateway;
 use AnotherEcommerce\Products\ProductRepository;
 
@@ -18,10 +23,17 @@ use AnotherEcommerce\Products\ProductRepository;
  *
  * Flujo de compra:
  *  1. Shortcode [aep_comprar id="N"] muestra el formulario de ese producto
- *     (templates/form.php). Cada producto tiene su propio botón "Comprar
- *     ahora"; no hay carrito ni catálogo compartido.
- *  2. El POST llega a admin-post.php (action aep_checkout) -> CheckoutController.
- *  3. Webpay redirige de vuelta a ?aep-action=webpay-return -> ReturnController.
+ *     (templates/form.php), con un selector de medio de pago si el producto
+ *     tiene precio USD y hay algún gateway internacional configurado. Cada
+ *     producto tiene su propio botón "Comprar ahora"; no hay carrito ni
+ *     catálogo compartido.
+ *  2. El POST llega a admin-post.php (action aep_checkout) -> CheckoutController,
+ *     que resuelve el gateway elegido vía GatewayRegistry.
+ *  3. El gateway redirige de vuelta a ?aep-action={gateway}-return ->
+ *     ReturnController (Webpay) o InternationalReturnController (Stripe /
+ *     Lemon Squeezy). Stripe y Lemon Squeezy además mandan un webhook a
+ *     ?aep-action={gateway}-webhook -> PaymentWebhookController, que es la
+ *     única fuente de verdad para Lemon Squeezy.
  *  4. La descarga se sirve en ?aep-action=download -> DownloadController.
  */
 final class Plugin
@@ -30,7 +42,10 @@ final class Plugin
 
     private OrderRepository $orders;
     private ProductRepository $products;
-    private WebpayGateway $gateway;
+    private WebpayGateway $webpayGateway;
+    private StripeGateway $stripeGateway;
+    private LemonSqueezyGateway $lemonSqueezyGateway;
+    private GatewayRegistry $gateways;
     private Mailer $mailer;
 
     public static function boot(): self
@@ -46,7 +61,10 @@ final class Plugin
     {
         $this->orders = new OrderRepository();
         $this->products = new ProductRepository();
-        $this->gateway = new WebpayGateway();
+        $this->webpayGateway = new WebpayGateway($this->orders);
+        $this->stripeGateway = new StripeGateway($this->orders);
+        $this->lemonSqueezyGateway = new LemonSqueezyGateway($this->orders);
+        $this->gateways = new GatewayRegistry($this->webpayGateway, $this->stripeGateway, $this->lemonSqueezyGateway);
         $this->mailer = new Mailer();
 
         // Aplica cambios de esquema (columnas/tablas nuevas) en sitios donde
@@ -60,15 +78,15 @@ final class Plugin
 
         add_shortcode('aep_comprar', [$this, 'renderShortcode']);
 
-        $checkout = new CheckoutController($this->orders, $this->gateway, $this->products, $this->mailer);
+        $checkout = new CheckoutController($this->orders, $this->gateways, $this->products, $this->mailer);
         add_action('admin_post_nopriv_aep_checkout', [$checkout, 'handle']);
         add_action('admin_post_aep_checkout', [$checkout, 'handle']);
 
         add_action('template_redirect', [$this, 'routeFrontActions']);
 
-        // Reconcilia (vía WP-Cron) órdenes cuyo navegador nunca volvió del
-        // retorno de Webpay, para no dejar cobros sin entrega ni registro.
-        $reconciler = new OrderReconciler($this->orders, $this->gateway, $this->mailer);
+        // Reconcilia (vía WP-Cron) órdenes Webpay/Stripe cuyo navegador nunca
+        // volvió del retorno, para no dejar cobros sin entrega ni registro.
+        $reconciler = new OrderReconciler($this->orders, $this->webpayGateway, $this->stripeGateway, $this->mailer);
         add_action('aep_reconcile_orders', [$reconciler, 'reconcile']);
 
         if (is_admin()) {
@@ -118,7 +136,29 @@ final class Plugin
         }
 
         if ($action === 'webpay-return') {
-            (new ReturnController($this->orders, $this->gateway, $this->mailer))->handle();
+            (new ReturnController($this->orders, $this->webpayGateway, $this->mailer))->handle();
+            exit;
+        }
+
+        $international = static fn (): InternationalReturnController => new InternationalReturnController(
+            $this->orders,
+            $this->stripeGateway,
+            $this->mailer
+        );
+
+        if ($action === 'stripe-return') {
+            $international()->handleStripe();
+            exit;
+        }
+
+        if ($action === 'lemonsqueezy-return') {
+            $international()->handleLemonSqueezy();
+            exit;
+        }
+
+        if ($action === 'stripe-webhook' || $action === 'lemonsqueezy-webhook') {
+            $webhooks = new PaymentWebhookController($this->orders, $this->stripeGateway, $this->lemonSqueezyGateway, $this->mailer);
+            $action === 'stripe-webhook' ? $webhooks->handleStripe() : $webhooks->handleLemonSqueezy();
             exit;
         }
 
@@ -188,6 +228,7 @@ final class Plugin
             'settings' => SettingsPage::all(),
             'error_message' => CheckoutController::errorMessage($error),
             'page_url' => get_permalink() ?: home_url('/'),
+            'gateways' => $this->gateways->availableFor($product),
         ]);
     }
 

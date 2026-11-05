@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Another Ecommerce Plugin
  * Description:       Venta de PDFs con botón "Comprar ahora" súper simplificado: pago con Webpay Plus (Transbank), sin carrito ni registro, entrega por correo con enlace de descarga temporal.
- * Version:           1.1.1
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Zumito
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AEP_VERSION', '1.1.1');
+define('AEP_VERSION', '1.2.0');
 define('AEP_FILE', __FILE__);
 define('AEP_DIR', plugin_dir_path(__FILE__));
 define('AEP_URL', plugin_dir_url(__FILE__));

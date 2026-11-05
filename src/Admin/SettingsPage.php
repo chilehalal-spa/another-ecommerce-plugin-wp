@@ -23,7 +23,7 @@ final class SettingsPage
     private const PER_PAGE = 25;
 
     private const TABS = [
-        'general' => 'General',
+        'payments' => 'Medios de pago',
         'delivery' => 'Entrega',
         'smtp' => 'SMTP',
         'email' => 'Correo',
@@ -57,6 +57,14 @@ final class SettingsPage
             'email_subject' => 'Tu compra: {producto}',
             'email_body' => '<p>Hola {nombre}:</p><p>¡Gracias por tu compra! (orden {orden}).</p><p>Descarga tu copia de &#8220;{producto}&#8221; con el botón de abajo. El enlace es personal, vence en {horas} horas y admite hasta {descargas} descargas.</p><p>Si tienes cualquier problema, responde este correo.</p>',
             'terms_text' => '<p>Al comprar aceptas la entrega inmediata del contenido digital y renuncias expresamente al derecho de retracto (art. 3 bis letra b, Ley 19.496). Esta compra no admite reembolsos.</p>',
+            'stripe_enabled' => '',
+            'stripe_secret_key' => '',
+            'stripe_webhook_secret' => '',
+            'ls_enabled' => '',
+            'ls_api_key' => '',
+            'ls_store_id' => '',
+            'ls_variant_id' => '',
+            'ls_webhook_secret' => '',
         ];
     }
 
@@ -110,9 +118,9 @@ final class SettingsPage
 
     private function currentTab(): string
     {
-        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'general'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'payments'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-        return isset(self::TABS[$tab]) ? $tab : 'general';
+        return isset(self::TABS[$tab]) ? $tab : 'payments';
     }
 
     public function renderSettingsPage(): void
@@ -156,7 +164,7 @@ final class SettingsPage
                     'smtp' => $this->renderSmtpTab($s),
                     'email' => $this->renderEmailTab($s),
                     'terms' => $this->renderTermsTab($s),
-                    default => $this->renderGeneralTab($s),
+                    default => $this->renderPaymentsTab($s),
                 };
                 ?>
             </div>
@@ -205,10 +213,17 @@ final class SettingsPage
         ]);
     }
 
-    private function renderGeneralTab(array $s): void
+    /**
+     * Los tres medios de pago juntos en una sola pantalla: Webpay (CLP,
+     * siempre disponible) y Stripe/Lemon Squeezy (USD, opcionales — solo se
+     * ofrecen en productos con precio USD configurado en Venta PDF →
+     * Productos).
+     */
+    private function renderPaymentsTab(array $s): void
     {
-        $this->tabFormStart('general');
+        $this->tabFormStart('payments');
         ?>
+        <tr><th colspan="2"><h3 style="margin-bottom:0;">Webpay (CLP)</h3></th></tr>
         <tr>
             <th scope="row"><label for="aep-environment">Ambiente Webpay</label></th>
             <td>
@@ -226,6 +241,62 @@ final class SettingsPage
         <tr>
             <th scope="row"><label for="aep-api-key">API Key Secret (producción)</label></th>
             <td><input type="password" id="aep-api-key" class="regular-text" autocomplete="off" name="api_key" value="<?php echo esc_attr($s['api_key']); ?>"></td>
+        </tr>
+
+        <tr><th colspan="2"><h3 style="margin-bottom:0;">Stripe (USD)</h3></th></tr>
+        <tr>
+            <th scope="row"><label for="aep-stripe-enabled">Habilitar Stripe</label></th>
+            <td><label><input type="checkbox" id="aep-stripe-enabled" name="stripe_enabled" value="1" <?php checked(!empty($s['stripe_enabled'])); ?>> Ofrecer Stripe como medio de pago en USD</label></td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-stripe-secret-key">Secret Key</label></th>
+            <td>
+                <input type="password" id="aep-stripe-secret-key" class="regular-text" autocomplete="off" name="stripe_secret_key" value="<?php echo esc_attr($s['stripe_secret_key']); ?>" placeholder="sk_test_… o sk_live_…">
+                <p class="description">En modo de pruebas usa la Secret Key que empieza con <code>sk_test_</code> del <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener">dashboard de Stripe</a>.</p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-stripe-webhook-secret">Webhook signing secret</label></th>
+            <td>
+                <input type="password" id="aep-stripe-webhook-secret" class="regular-text" autocomplete="off" name="stripe_webhook_secret" value="<?php echo esc_attr($s['stripe_webhook_secret']); ?>" placeholder="whsec_…">
+                <p class="description">
+                    Crea un endpoint de webhook en Stripe apuntando a:<br>
+                    <code><?php echo esc_html(add_query_arg('aep-action', 'stripe-webhook', home_url('/'))); ?></code><br>
+                    escuchando el evento <code>checkout.session.completed</code> (y opcionalmente <code>checkout.session.async_payment_succeeded</code>/<code>_failed</code>), y pega aquí el "Signing secret" que te muestra.
+                </p>
+            </td>
+        </tr>
+
+        <tr><th colspan="2"><h3 style="margin-bottom:0;">Lemon Squeezy (USD)</h3></th></tr>
+        <tr>
+            <th scope="row"><label for="aep-ls-enabled">Habilitar Lemon Squeezy</label></th>
+            <td><label><input type="checkbox" id="aep-ls-enabled" name="ls_enabled" value="1" <?php checked(!empty($s['ls_enabled'])); ?>> Ofrecer Lemon Squeezy como medio de pago en USD</label></td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-ls-api-key">API Key</label></th>
+            <td><input type="password" id="aep-ls-api-key" class="regular-text" autocomplete="off" name="ls_api_key" value="<?php echo esc_attr($s['ls_api_key']); ?>"></td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-ls-store-id">Store ID</label></th>
+            <td><input type="text" id="aep-ls-store-id" class="regular-text" name="ls_store_id" value="<?php echo esc_attr($s['ls_store_id']); ?>"></td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-ls-variant-id">Variant ID</label></th>
+            <td>
+                <input type="text" id="aep-ls-variant-id" class="regular-text" name="ls_variant_id" value="<?php echo esc_attr($s['ls_variant_id']); ?>">
+                <p class="description">Crea de antemano UN producto/variante cualquiera en tu tienda de Lemon Squeezy (ej. "Descarga digital"): el checkout se genera contra esa variante y el precio se sobreescribe con el precio USD de cada producto de este plugin.</p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="aep-ls-webhook-secret">Webhook signing secret</label></th>
+            <td>
+                <input type="password" id="aep-ls-webhook-secret" class="regular-text" autocomplete="off" name="ls_webhook_secret" value="<?php echo esc_attr($s['ls_webhook_secret']); ?>">
+                <p class="description">
+                    Crea un webhook en Lemon Squeezy apuntando a:<br>
+                    <code><?php echo esc_html(add_query_arg('aep-action', 'lemonsqueezy-webhook', home_url('/'))); ?></code><br>
+                    escuchando el evento <code>order_created</code>, y pega aquí el "Signing secret" que definiste.
+                </p>
+            </td>
         </tr>
         <?php
         $this->tabFormEnd();
@@ -354,10 +425,18 @@ final class SettingsPage
     public static function sanitizeTab(string $tab, array $current, array $post): array
     {
         return match ($tab) {
-            'general' => array_merge($current, [
+            'payments' => array_merge($current, [
                 'environment' => ($post['environment'] ?? '') === 'production' ? 'production' : 'integration',
                 'commerce_code' => sanitize_text_field($post['commerce_code'] ?? ''),
                 'api_key' => sanitize_text_field($post['api_key'] ?? ''),
+                'stripe_enabled' => !empty($post['stripe_enabled']) ? '1' : '',
+                'stripe_secret_key' => sanitize_text_field($post['stripe_secret_key'] ?? ''),
+                'stripe_webhook_secret' => sanitize_text_field($post['stripe_webhook_secret'] ?? ''),
+                'ls_enabled' => !empty($post['ls_enabled']) ? '1' : '',
+                'ls_api_key' => sanitize_text_field($post['ls_api_key'] ?? ''),
+                'ls_store_id' => sanitize_text_field($post['ls_store_id'] ?? ''),
+                'ls_variant_id' => sanitize_text_field($post['ls_variant_id'] ?? ''),
+                'ls_webhook_secret' => sanitize_text_field($post['ls_webhook_secret'] ?? ''),
             ]),
             'delivery' => array_merge($current, [
                 'link_hours' => max(1, absint($post['link_hours'] ?? 72)),
@@ -398,9 +477,9 @@ final class SettingsPage
             wp_die('Sin permisos suficientes.');
         }
 
-        $tab = isset($_POST['aep_tab']) ? sanitize_key(wp_unslash($_POST['aep_tab'])) : 'general';
+        $tab = isset($_POST['aep_tab']) ? sanitize_key(wp_unslash($_POST['aep_tab'])) : 'payments';
         if (!isset(self::TABS[$tab])) {
-            $tab = 'general';
+            $tab = 'payments';
         }
         check_admin_referer('aep_save_settings_' . $tab);
 
@@ -495,6 +574,11 @@ final class SettingsPage
             'failed' => 'Rechazada',
             'aborted' => 'Anulada',
         ];
+        $gatewayLabels = [
+            'webpay' => 'Webpay',
+            'stripe' => 'Stripe',
+            'lemonsqueezy' => 'Lemon Squeezy',
+        ];
         ?>
         <div class="wrap">
             <h1>Venta PDF — Ventas (<?php echo esc_html((string) $total); ?>)</h1>
@@ -515,17 +599,18 @@ final class SettingsPage
                         <th>Producto</th>
                         <th>Cliente</th>
                         <th>Correo</th>
+                        <th>Medio de pago</th>
                         <th>Monto</th>
                         <th>Estado</th>
                         <th>Autorización</th>
-                        <th>Token Webpay</th>
+                        <th>Referencia</th>
                         <th>Descargas</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ($orders === []) : ?>
-                    <tr><td colspan="11">Sin ventas todavía.</td></tr>
+                    <tr><td colspan="12">Sin ventas todavía.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($orders as $order) : ?>
                     <tr>
@@ -534,7 +619,8 @@ final class SettingsPage
                         <td><?php echo esc_html($order->product_name); ?></td>
                         <td><?php echo esc_html($order->customer_name); ?></td>
                         <td><?php echo esc_html($order->customer_email); ?></td>
-                        <td><?php echo $order->amount > 0 ? '$' . esc_html(number_format($order->amount, 0, ',', '.')) : 'Gratis'; ?></td>
+                        <td><?php echo esc_html($gatewayLabels[$order->gateway] ?? $order->gateway); ?></td>
+                        <td><?php echo esc_html($order->formattedAmount()); ?></td>
                         <td><?php echo esc_html($statusLabels[$order->status] ?? $order->status); ?></td>
                         <td>
                             <?php echo esc_html($order->authorization_code); ?>
@@ -542,7 +628,7 @@ final class SettingsPage
                                 <span class="description">(···<?php echo esc_html($order->card_last4); ?>)</span>
                             <?php endif; ?>
                         </td>
-                        <td><code><?php echo esc_html($order->token_ws); ?></code></td>
+                        <td><code><?php echo esc_html($order->token_ws !== '' ? $order->token_ws : $order->gateway_reference); ?></code></td>
                         <td><?php echo esc_html((string) $order->downloads); ?></td>
                         <td>
                             <?php if ($order->status === 'paid') : ?>

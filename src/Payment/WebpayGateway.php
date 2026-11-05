@@ -3,6 +3,8 @@
 namespace AnotherEcommerce\Payment;
 
 use AnotherEcommerce\Admin\SettingsPage;
+use AnotherEcommerce\Orders\Order;
+use AnotherEcommerce\Orders\OrderRepository;
 use RuntimeException;
 use Transbank\Webpay\Options;
 use Transbank\Webpay\WebpayPlus\Transaction;
@@ -14,14 +16,46 @@ use Transbank\Webpay\WebpayPlus\Transaction;
  * Transbank, así que se puede probar el flujo completo sin tener aún el
  * código de comercio productivo.
  */
-final class WebpayGateway
+final class WebpayGateway implements PaymentGatewayInterface
 {
     private const INTEGRATION_COMMERCE_CODE = '597055555532';
     private const INTEGRATION_API_KEY = '579B532A7440BB0C9079DED94D31EA1615BACEB56610332264630D42D0A36B1C';
 
+    public function __construct(private OrderRepository $orders)
+    {
+    }
+
     public static function sdkAvailable(): bool
     {
         return class_exists(Transaction::class);
+    }
+
+    public function id(): string
+    {
+        return 'webpay';
+    }
+
+    public function isConfigured(): bool
+    {
+        return self::sdkAvailable();
+    }
+
+    /**
+     * Adaptador a PaymentGatewayInterface: crea la transacción y persiste el
+     * token en la orden (token_ws, usado por ReturnController) antes de
+     * devolver la URL de redirección — CheckoutController ya no necesita
+     * conocer el formato particular de la respuesta de Webpay.
+     */
+    public function createCheckout(Order $order, string $returnUrl): string
+    {
+        $result = $this->createTransaction($order->buy_order, 'S-' . $order->id, $order->amount, $returnUrl);
+
+        $this->orders->update($order->id, [
+            'token_ws' => $result['token'],
+            'gateway_reference' => $result['token'],
+        ]);
+
+        return $result['url'] . '?token_ws=' . rawurlencode($result['token']);
     }
 
     /**

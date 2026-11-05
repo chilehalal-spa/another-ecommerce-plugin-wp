@@ -22,6 +22,12 @@ final class Order
     public string $product_name = '';
     public string $pdf_file = '';
     public int $amount = 0;
+    /** 'webpay' | 'stripe' | 'lemonsqueezy' */
+    public string $gateway = 'webpay';
+    /** 'CLP' (amount = pesos) | 'USD' (amount = centavos) */
+    public string $currency = 'CLP';
+    /** Id externo de la transacción: Checkout Session de Stripe, referencia propia para Lemon Squeezy. */
+    public string $gateway_reference = '';
     public string $authorization_code = '';
     public string $payment_type = '';
     public string $card_last4 = '';
@@ -45,6 +51,9 @@ final class Order
         $order->product_name = (string) $row->product_name;
         $order->pdf_file = (string) $row->pdf_file;
         $order->amount = (int) $row->amount;
+        $order->gateway = (string) ($row->gateway ?? 'webpay');
+        $order->currency = (string) ($row->currency ?? 'CLP');
+        $order->gateway_reference = (string) ($row->gateway_reference ?? '');
         $order->authorization_code = (string) $row->authorization_code;
         $order->payment_type = (string) $row->payment_type;
         $order->card_last4 = (string) $row->card_last4;
@@ -65,5 +74,22 @@ final class Order
         }
 
         return strtotime($this->download_expires_at . ' UTC') < time();
+    }
+
+    /**
+     * CLP se guarda en pesos enteros; USD se guarda en centavos (convención
+     * de Stripe/Lemon Squeezy), así que la conversión a texto difiere.
+     */
+    public function formattedAmount(): string
+    {
+        if ($this->amount === 0) {
+            return 'Gratis';
+        }
+
+        if ($this->currency === 'USD') {
+            return 'US$' . number_format($this->amount / 100, 2, '.', ',');
+        }
+
+        return '$' . number_format($this->amount, 0, ',', '.');
     }
 }

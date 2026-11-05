@@ -1,9 +1,11 @@
 # Another Ecommerce Plugin
 
 Plugin de WordPress para vender **PDFs** con botón **"Comprar ahora"**: sin
-carrito, sin registro de usuarios, pago con **Webpay Plus (Transbank)** y
-entrega por correo con un enlace de descarga temporal. Sin reembolsos (el
-cliente acepta términos con renuncia expresa al retracto antes de pagar).
+carrito, sin registro de usuarios, pago con **Webpay Plus (Transbank)** en
+CLP y, opcionalmente, **Stripe**/**Lemon Squeezy** en USD para clientes
+internacionales, con entrega por correo mediante un enlace de descarga
+temporal. Sin reembolsos (el cliente acepta términos con renuncia expresa al
+retracto antes de pagar).
 
 Puedes vender **varios productos**: cada uno es un PDF independiente, con su
 propio nombre, precio y botón de compra propio (no hay carrito ni catálogo
@@ -35,8 +37,10 @@ compartido — cada shortcode vende un único artículo).
 La pantalla **Venta PDF → Ajustes** se organiza en pestañas, cada una con su
 propio botón "Guardar" (guardar una pestaña no afecta a las demás):
 
-- **General**: ambiente de Webpay (integración/producción), código de
-  comercio y API Key.
+- **Medios de pago**: Webpay (ambiente integración/producción, código de
+  comercio y API Key), y Stripe/Lemon Squeezy (ver
+  [Venta internacional](#venta-internacional-usd-stripe-y-lemon-squeezy) más
+  abajo) — los tres juntos en una sola pantalla.
 - **Entrega**: vigencia del enlace de descarga (horas) y máximo de descargas
   por compra.
 - **SMTP**: servidor, puerto, cifrado, usuario/contraseña y remitente para
@@ -57,7 +61,7 @@ fecha de expiración; en el paso de autenticación usa RUT `11.111.111-1` y
 clave `123`.
 
 Cuando Transbank te entregue el código de comercio productivo, ingrésalo junto
-a la API Key en **Ajustes → General** y cambia el ambiente a **Producción**.
+a la API Key en **Ajustes → Medios de pago** y cambia el ambiente a **Producción**.
 
 ## La tarjeta de compra
 
@@ -101,6 +105,51 @@ producto al momento de la compra. Por eso:
   compras); el PDF permanece en el servidor para no romper enlaces de
   descarga ya entregados. Usa **Desactivar** si solo quieres dejar de vender
   el producto sin eliminarlo.
+
+## Venta internacional (USD): Stripe y Lemon Squeezy
+
+Webpay Plus solo liquida en CLP y es exclusivo del mercado chileno: no sirve
+para cobrarle a clientes internacionales en dólares. Para eso el plugin
+también puede cobrar con **Stripe** y/o **Lemon Squeezy**, ofrecidos junto a
+Webpay (no en reemplazo) — el cliente elige el medio de pago en el
+formulario de compra si el producto tiene precio en USD.
+
+1. En cada producto (**Venta PDF → Productos**) fija, además del precio en
+   CLP, un **Precio USD** (ej. `9.99`). Sin precio USD, ese producto no
+   ofrece Stripe ni Lemon Squeezy como opción, solo Webpay.
+2. En **Venta PDF → Ajustes → Medios de pago** activa el/los proveedores que
+   quieras usar y completa sus credenciales:
+   - **Stripe**: Secret Key (`sk_test_…` para pruebas, `sk_live_…` en
+     producción) y el "Signing secret" del webhook que crees apuntando a la
+     URL que la propia pestaña de ajustes te muestra, escuchando
+     `checkout.session.completed`.
+   - **Lemon Squeezy**: API Key, Store ID, y el ID de **una** variante que
+     debes crear de antemano en tu tienda de Lemon Squeezy (el checkout se
+     genera contra esa variante y el precio se sobreescribe por compra). El
+     "Signing secret" del webhook que crees apuntando a la URL que te
+     muestra la pestaña, escuchando `order_created`.
+3. Con eso, el formulario de compra de cualquier producto con precio USD
+   muestra un selector de medio de pago (Webpay CLP / Stripe USD / Lemon
+   Squeezy USD).
+
+**Confirmación de pago**: Stripe se confirma de inmediato al volver del
+checkout (y su webhook es la red de seguridad si el navegador nunca vuelve).
+Lemon Squeezy no manda nada verificable en el retorno del navegador: depende
+enteramente de su webhook, así que el cliente ve una pantalla de "confirmando
+tu pago" que se refresca sola (sin JavaScript) hasta que el webhook llega —
+normalmente unos segundos.
+
+**Probar sin tener las cuentas de producción**: usa el modo de pruebas de
+ambos proveedores (Stripe test mode con tarjeta `4242 4242 4242 4242`, Lemon
+Squeezy test mode) — funciona igual que el ambiente de Integración de
+Webpay, sin cobrar dinero real.
+
+**Nota para probar en local**: Stripe y Lemon Squeezy necesitan una URL
+pública para mandar sus webhooks; `localhost`/`*.local` no sirve. Para
+probar el flujo completo en un sitio local hace falta un túnel (ngrok,
+Cloudflare Tunnel, etc.) apuntando al sitio, y configurar esa URL pública
+como endpoint del webhook en ambos dashboards (en modo test). El retorno
+normal del navegador sí funciona sin túnel.
 
 ## Notas de despliegue
 

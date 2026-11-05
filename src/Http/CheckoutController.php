@@ -6,23 +6,26 @@ use AnotherEcommerce\Admin\SettingsPage;
 use AnotherEcommerce\Delivery\Mailer;
 use AnotherEcommerce\Orders\Order;
 use AnotherEcommerce\Orders\OrderRepository;
-use AnotherEcommerce\Payment\WebpayGateway;
+use AnotherEcommerce\Payment\GatewayRegistry;
 use AnotherEcommerce\Products\ProductRepository;
 use Throwable;
 
 /**
- * Recibe el POST del formulario de compra, crea la orden y redirige a Webpay.
- * El precio SIEMPRE sale del producto guardado en el servidor, nunca del
- * formulario (el formulario solo manda el id del producto).
+ * Recibe el POST del formulario de compra, crea la orden y redirige al medio
+ * de pago elegido (Webpay en CLP, o Stripe/Lemon Squeezy en USD). El precio
+ * SIEMPRE sale del producto guardado en el servidor, nunca del formulario
+ * (el formulario solo manda el id del producto y el gateway elegido).
  *
- * Los productos a $0 no pasan por Webpay (Transbank no procesa cobros de
- * $0): la orden se marca pagada y se entrega de inmediato.
+ * Los productos a $0 no pasan por ningún gateway (Webpay no procesa cobros
+ * de $0, y los internacionales ni siquiera aparecen como opción si el
+ * producto no tiene precio en USD): la orden se marca pagada y se entrega
+ * de inmediato.
  */
 final class CheckoutController
 {
     public function __construct(
         private OrderRepository $orders,
-        private WebpayGateway $gateway,
+        private GatewayRegistry $gateways,
         private ProductRepository $products,
         private Mailer $mailer,
     ) {
@@ -81,37 +84,48 @@ final class CheckoutController
             return;
         }
 
-        $order = $this->orders->create($name, $email, $product, $pageUrl);
+        $gatewayId = isset($_POST['aep_gateway']) ? sanitize_key(wp_unslash($_POST['aep_gateway'])) : 'webpay';
+        $gateway = $this->gateways->get($gatewayId);
+
+        // Defensa contra un POST manipulado: solo se acepta un gateway que
+        // realmente esté disponible para este producto (configurado, y con
+        // precio USD fijado si es uno de los internacionales).
+        if ($gateway === null || !in_array($gateway, $this->gateways->availableFor($product), true)) {
+            $this->backToForm($pageUrl, $productId, 'invalid_gateway');
+
+            return;
+        }
+
+        $currency = GatewayRegistry::currencyFor($gatewayId);
+        $amount = $currency === 'CLP' ? $product->price : $product->price_usd;
+
+        $order = $this->orders->create($name, $email, $product, $pageUrl, $amount, $currency, $gatewayId);
         if ($order === null) {
             $this->backToForm($pageUrl, $productId, 'internal');
 
             return;
         }
 
-        if ($product->price === 0) {
+        if ($amount === 0) {
             $this->deliverFree($order, $pageUrl);
 
             return;
         }
 
         try {
-            $result = $this->gateway->createTransaction(
-                $order->buy_order,
-                'S-' . $order->id,
-                $product->price,
-                add_query_arg('aep-action', 'webpay-return', home_url('/'))
+            $checkoutUrl = $gateway->createCheckout(
+                $order,
+                add_query_arg('aep-action', $gatewayId . '-return', home_url('/'))
             );
         } catch (Throwable $e) {
             $this->orders->update($order->id, ['status' => 'failed']);
-            error_log('[AEP] Error creando transacción Webpay: ' . $e->getMessage());
-            $this->backToForm($pageUrl, $productId, 'webpay');
+            error_log('[AEP] Error creando transacción (' . $gatewayId . '): ' . $e->getMessage());
+            $this->backToForm($pageUrl, $productId, 'gateway');
 
             return;
         }
 
-        $this->orders->update($order->id, ['token_ws' => $result['token']]);
-
-        wp_redirect($result['url'] . '?token_ws=' . rawurlencode($result['token']));
+        wp_redirect($checkoutUrl);
         exit;
     }
 
@@ -123,7 +137,8 @@ final class CheckoutController
             'email_mismatch' => 'Los correos no coinciden. Revísalos: el PDF se envía a ese correo.',
             'terms' => 'Debes aceptar los términos de compra para continuar.',
             'unconfigured' => 'Este producto no está disponible en este momento. Intenta más tarde.',
-            'webpay' => 'No pudimos conectar con Webpay. Intenta nuevamente en unos minutos.',
+            'invalid_gateway' => 'Ese medio de pago no está disponible para este producto. Elige otro.',
+            'gateway' => 'No pudimos conectar con el medio de pago. Intenta nuevamente en unos minutos.',
             'internal' => 'Ocurrió un error interno. Intenta nuevamente.',
             'nonce' => 'La sesión del formulario expiró. Vuelve a intentarlo.',
             'bot' => 'No pudimos validar el envío del formulario.',

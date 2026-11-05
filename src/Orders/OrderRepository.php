@@ -21,8 +21,11 @@ final class OrderRepository
      * Crea la orden copiando nombre, precio y archivo del producto tal como
      * estaban al momento de la compra (snapshot): si luego el producto se
      * edita, renombra o elimina, esta orden y su descarga siguen intactas.
+     *
+     * $amount/$currency se pasan aparte (no siempre son $product->price/CLP):
+     * una compra en Stripe o Lemon Squeezy usa $product->price_usd en USD.
      */
-    public function create(string $name, string $email, Product $product, string $pageUrl): ?Order
+    public function create(string $name, string $email, Product $product, string $pageUrl, int $amount, string $currency, string $gateway): ?Order
     {
         global $wpdb;
 
@@ -35,7 +38,9 @@ final class OrderRepository
             'product_id' => $product->id,
             'product_name' => $product->name,
             'pdf_file' => $product->pdf_file,
-            'amount' => $product->price,
+            'amount' => $amount,
+            'gateway' => $gateway,
+            'currency' => $currency,
             'page_url' => $pageUrl,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -76,6 +81,29 @@ final class OrderRepository
         global $wpdb;
 
         $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$this->table} WHERE buy_order = %s", $buyOrder));
+
+        return $row ? Order::fromRow($row) : null;
+    }
+
+    /**
+     * Busca por la referencia externa del gateway (Checkout Session de
+     * Stripe, referencia propia enviada como custom_data a Lemon Squeezy).
+     * Se filtra también por $gateway porque esa referencia solo es única
+     * dentro de cada proveedor, no globalmente.
+     */
+    public function findByGatewayReference(string $gateway, string $reference): ?Order
+    {
+        global $wpdb;
+
+        if ($reference === '') {
+            return null;
+        }
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$this->table} WHERE gateway = %s AND gateway_reference = %s",
+            $gateway,
+            $reference
+        ));
 
         return $row ? Order::fromRow($row) : null;
     }
@@ -140,10 +168,15 @@ final class OrderRepository
     }
 
     /**
-     * Órdenes 'pending'/'processing' con una transacción Webpay creada
-     * (token_ws) que llevan más de $minutesOld sin resolverse: el navegador
-     * del cliente probablemente nunca volvió del retorno. Candidatas para
-     * que OrderReconciler consulte su estado real en Transbank.
+     * Órdenes 'pending'/'processing' con una transacción creada (token_ws
+     * para Webpay, gateway_reference para Stripe) que llevan más de
+     * $minutesOld sin resolverse: el navegador del cliente probablemente
+     * nunca volvió del retorno. Candidatas para que OrderReconciler consulte
+     * su estado real en el gateway correspondiente.
+     *
+     * Lemon Squeezy queda fuera a propósito: no hay una forma barata de
+     * consultar el estado de un checkout sin conocer ya su order id, así que
+     * depende enteramente de su webhook (ver OrderReconciler).
      *
      * @return Order[]
      */
@@ -155,7 +188,9 @@ final class OrderRepository
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table}
-             WHERE status IN ('pending', 'processing') AND token_ws != '' AND created_at <= %s
+             WHERE status IN ('pending', 'processing')
+               AND ((gateway = 'webpay' AND token_ws != '') OR (gateway = 'stripe' AND gateway_reference != ''))
+               AND created_at <= %s
              ORDER BY id ASC
              LIMIT %d",
             $threshold,
